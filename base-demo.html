@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog WebGPU - Base Demo</title>
+
+    <style>
+        :root {
+            --tp-base-background-color: hsla(0, 0%, 10%, 0.8);
+            --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+            --tp-button-background-color: hsla(0, 0%, 80%, 1);
+            --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+            --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+            --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+            --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+            --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+            --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.3);
+        }
+
+        /*body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }*/
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            transform: translateZ(0); /* Force GPU Layer */
+        }
+        
+        /* Containers for the Widgets */
+        .widget-pane {
+            /*position: fixed;*/
+            position: absolute;
+            z-index: 10;
+            width: 260px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            /* Avoid that events affect the canvas if not necessary */
+            pointer-events: auto; 
+
+            transform: translateZ(0); /* Crea un nuevo stacking context en GPU */
+            backface-visibility: hidden;
+            perspective: 1000;
+            will-change: transform, opacity;
+        }
+
+        #ui-camera { top: 10px; right: 300px; }
+        #ui-geometry { top: 10px; right: 20px; }
+        #ui-performance { bottom: 20px; left: 10px; width: 200px; }
+        #ui-config { top: 10px; left: 10px; }
+        
+        .label { position: fixed; bottom: 10px; right: 20px; color: #555; font-size: 12px; }
+    </style>
+
+    <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
+    <link rel="icon" href="/DogEngine/ico/Triangle_icon.png" type="image/png">
+
+    <script>
+        // Global state for the performance monitor
+        var performanceState = {
+            fps: 0.0
+        };
+        // Global state for the configuration parameters
+        var configState = {
+            background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+        };
+    </script>
+
+    <script type="module">
+        import { Pane } from '/DogEngine/lib/tweakpane-4.0.5.js';
+
+        // --- Widget 1: Performance  ---
+        const panePerformance = new Pane({ container: document.getElementById('ui-performance'), title: '📊 Performance' });
+        panePerformance.addBinding(performanceState, 'fps', { label: 'FPS', readonly: true, view: 'number' }).on('change', emitUI);
+        panePerformance.addBinding(performanceState, 'fps', { 
+            label: 'FPS Graph', readonly: true, view: 'graph', 
+            interval: 100, bufferSize: 64, min: 10, max: 200 
+        }).on('change', emitUI);
+
+        // --- Widget 2: Config  ---
+        const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
+        paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
+
+
+        // Send data to the engine
+        function emitUI() {
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+        }
+
+        // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
+        setInterval(() => {
+            panePerformance.refresh();
+        }, 100);
+
+        // Emit initial state
+        emitUI();
+    </script>
+
+    <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
+</head>
+<body onload="init();">
+    <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
+
+    <!-- Containers for Tweakpane -->
+    <div id="ui-performance" class="widget-pane"></div>
+    <div id="ui-config" class="widget-pane"></div>
+
+    <script type="text/javascript">
+        var canvas;
+        var pGraphics;
+
+        let lastTime = 0;
+
+        /******* Events' names for clean communication *******/
+        const EVT_DATA = 'engine-data-update';
+        const EVT_UI = 'ui-params-change';
+
+        /**
+         * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
+         */
+        async function init(){
+            canvas = document.getElementById("WebGPUcanvas");
+
+            pGraphics = await webGPUengine.initWebGPU(canvas);
+
+            window.onkeydown = event => this.onKeyDown(event);
+            window.onkeyup = event => this.onKeyUp(event);
+            canvas.onmouseup = event => this.onMouseUp(event);
+            canvas.onmousedown = event => this.onMouseDown(event);
+            canvas.onmousemove = event => this.onMouseMove(event);
+
+            requestAnimationFrame(updateAndRender);
+        }
+
+        //------------- Input -------------
+        /**
+         * Release click and stop dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseUp(event) {
+            this.dragging = false;
+            mouse.down = false;
+        }
+
+        /**
+         * Click and start dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseDown(event) {
+            this.dragging = true;
+            var x = event.clientX; // x coordinate of a mouse pointer
+            var y = event.clientY; // y coordinate of a mouse pointer
+            var rect = event.target.getBoundingClientRect();
+
+            //console.log("Mouse down at: " + x + ", " + y);
+            mouse.down = true;
+            mouse.x = x;
+            mouse.y = y;
+
+            //x = ((x - rect.left) - canvas.width / 2) / (canvas.width / 2);
+            //y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2);
+            console.log("Mouse down at: " + x + ", " + y);
+        }
+
+        /**
+         * If dragging, calculates the difference in mouse position and rotates the camera.
+         * @param {MouseEvent} event 
+         */
+        function onMouseMove(event){
+            this.lastX = this.x;
+            this.lastY = this.y;
+
+            this.x = event.clientX;
+            this.y = event.clientY;
+
+            mouse.x = this.x;
+            mouse.y = this.y;
+
+            if (!this.dragging) 
+                return;
+        }
+
+        /**
+         * Handles input events.
+         */
+        function input(){
+            
+        }
+
+        //------------- End Input -------------
+        /**
+         * Updates the performance state and handles input.
+         * @param {float} time - The current time in milliseconds.
+         */
+        function update(time){
+            const dt = (time - lastTime);
+            lastTime = time;
+            
+            performanceState.fps = 1000 / dt;
+
+            input();
+        }
+
+        /**
+         * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
+         */
+        function render(){
+            // Rendering logic goes here (e.g., issuing draw calls)
+            const encoder = pGraphics.device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                    view: pGraphics.context.getCurrentTexture().createView(),
+                    loadOp: "clear",
+                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
+                    storeOp: "store",
+                }]
+            });
+
+            pass.end();
+
+            const commandBuffer = encoder.finish();
+
+            // Finish the command buffer and immediately submit it.
+            pGraphics.device.queue.submit([commandBuffer]);
+            console.log("Frame rendered");
+        }
+
+        /**
+         * Combines the update and render functions into a single loop that runs on each animation frame.
+         * @param {float} currentTime - The current time in milliseconds.
+         */
+        function updateAndRender(currentTime){
+            update(currentTime);
+            render();
+
+            requestAnimationFrame(updateAndRender);
+        }
+    </script>
+</body>
+</html>
