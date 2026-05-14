@@ -18,10 +18,38 @@ function include(file) {
   document.getElementsByTagName('head').item(0).appendChild(script);
 }
 
-//----------- Include other js files here----------------
+//----------- Include other js files here ----------------
 include("/DogEngine/input/KeyCode.js");
 //-------------------------------------------------------
 
+
+//----------- Enums and global variables here ----------------
+/**
+ * Options to topology an object.
+ */
+const TopologyMode = Object.freeze({
+    TriangleList: "triangle-list",
+    LineList: "line-list",
+    PointList: "point-list"
+});
+
+/**
+ * Options to cull an object.
+ */
+const CullMode = Object.freeze({
+    Back: "back",
+    Front: "front",
+    None: "none"
+});
+
+/**
+ * Options to define the front face of an object.
+ */
+const FrontFaceMode = Object.freeze({
+    Ccw: "ccw",
+    Cw: "cw"
+});
+//------------------------------------------------------------
 
 (function(root, factory){
     if (typeof define === 'function' && define.amd) {
@@ -63,7 +91,8 @@ include("/DogEngine/input/KeyCode.js");
 
             return {
                 device: device,
-                context: context
+                context: context,
+                canvasFormat: canvasFormat
             };
         }
 
