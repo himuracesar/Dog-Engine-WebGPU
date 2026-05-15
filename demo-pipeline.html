@@ -114,6 +114,7 @@
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
     <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
 
+    <script type="text/javascript" src="/DogEngine/Camera.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/ColorPipeline.js"></script>
 </head>
@@ -136,29 +137,36 @@
         
         var angle = 0.0;
 
+        var vertices;
+        var indices;
+
         var vertexBuffer;
         var indexBuffer;
 
         var colorPipeline;
 
+        var camera;
+
         var modelMatrix;
-        var viewMatrix;
-        var projectionMatrix;
-        var cameraBuffer;
-        var bindGroup;
+        /*var viewMatrix;
+        var projectionMatrix;*/
+        //var cameraBuffer;
+        //var bindGroup;
         var modelBuffer;
         var modelBindGroup;
+
+        var depthTexture;
 
         //------------------- Demo's main functions -------------------
         function createShapes(){
             // position (3), color (4)
-            var vertices = new Float32Array([
+            vertices = new Float32Array([
                 //Front
                 -1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //0
                  1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //1
                  1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //2
                 -1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //3
-                //Letf
+                //Right
                 1.0, -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //4
                 1.0, -1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //5
                 1.0,  1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //6
@@ -168,7 +176,7 @@
                 -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //9
                 -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //10
                  1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //11
-                //Right
+                //Left
                 -1.0, -1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //12
                 -1.0, -1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //13
                 -1.0,  1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //14
@@ -185,16 +193,17 @@
                 -1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0  //23
             ]);
 
-            var indices = new Uint16Array([
-                //Front
+            indices = new Uint16Array([
+                //Back
                 0, 1, 2, 0, 2, 3,
                 //Right
                 4, 5, 6, 4, 6, 7,
-                //Back
+                //Front
                 8, 9, 10, 8, 10, 11,
                 //Left
                 12, 13, 14, 12, 14, 15,
                 //Top
+                //16, 17, 18, 16, 18, 19,
                 16, 17, 18, 16, 18, 19,
                 //Bottom
                 20, 21, 22, 20, 22, 23
@@ -211,18 +220,21 @@
                 size: indices.byteLength,
                 usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
             });
-
-            pGraphics.device.queue.writeBuffer(vertexBuffer, /*bufferOffset=*/0, vertices);
-            pGraphics.device.queue.writeBuffer(indexBuffer, /*bufferOffset=*/0, indices);
         }
 
         function createPipeline(){
             colorPipeline = new ColorPipeline();
+
+            depthTexture = pGraphics.device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            });
         }
 
         function createMatrices(){
             modelMatrix = glMatrix.mat4.create(); // Identity matrix
-            viewMatrix = glMatrix.mat4.create();
+            /*viewMatrix = glMatrix.mat4.create();
 
             const eye = [0.0, 0.0, 5.0];           // Camera position
             const center = [0.0, 0.0, 0.0];        // Point the camera looks at
@@ -238,13 +250,13 @@
             const zFar = 100.0;
 
             // Populate with perspective projection
-            glMatrix.mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+            glMatrix.mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);*/
 
-            const cameraBufferSize = 16 * 4 * 2; // Matrix4x4 has 16 floats, each float is 4 bytes, and we have 2 matrices (view and projection)
+            /*const cameraBufferSize = 16 * 4 * 2; // Matrix4x4 has 16 floats, each float is 4 bytes, and we have 2 matrices (view and projection)
             cameraBuffer = pGraphics.device.createBuffer({
                 size: cameraBufferSize,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
+            });*/
 
             const modelBufferSize = 16 * 4; // Matrix4x4 has 16 floats, each float is 4 bytes
             modelBuffer = pGraphics.device.createBuffer({
@@ -256,8 +268,19 @@
                 layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
                 entries: [{
                     binding: 0,
-                    resource: { buffer: cameraBuffer }
+                    //resource: { buffer: cameraBuffer }
+                    resource: { buffer: camera.getUniformBuffer() }
                 }],
+            });
+
+            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
+                entries: [{
+                    binding: 0,                           
+                    visibility: GPUShaderStage.VERTEX, 
+                    buffer: {
+                        type: "uniform"
+                    }
+                }]
             });
 
             modelBindGroup = pGraphics.device.createBindGroup({
@@ -270,7 +293,6 @@
         }
 
         //------------------ End demo's main functons -----------------
-
 
         /**
          * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
@@ -285,6 +307,11 @@
             canvas.onmouseup = event => this.onMouseUp(event);
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
+
+            camera = new Camera();
+            camera.setPosition([0.0, 0.0, 5.0]);
+            camera.setSpeed(0.2);
+            camera.setFarPlane(4000.0);
 
             createShapes();
             createPipeline();
@@ -339,13 +366,34 @@
 
             if (!this.dragging) 
                 return;
+
+            const dx = this.x - this.lastX;
+            const dy = this.y - this.lastY;
+
+            camera.yaw(dx * camera.getSpeedRotation());
+            camera.pitch(dy * camera.getSpeedRotation());
         }
 
         /**
          * Handles input events.
          */
         function input(){
-            
+            if(keypress[KeyCode.W])
+                camera.moveForward(1);
+            if(keypress[KeyCode.S])
+                camera.moveForward(-1);
+            if(keypress[KeyCode.A])
+                camera.strafe(-1);
+            if(keypress[KeyCode.D])
+                camera.strafe(1);
+            if(keypress[KeyCode.Left])
+                camera.yaw(0.01);
+            if(keypress[KeyCode.Right])
+                camera.yaw(-0.01);
+            if(keypress[KeyCode.Up])
+                camera.pitch(0.01);
+            if(keypress[KeyCode.Down])
+                camera.pitch(-0.01);
         }
 
         //------------- End Input -------------
@@ -361,11 +409,10 @@
 
             input();
 
-            angle = 2.5 * dt * 0.01; // Rotate 2 degrees per second
+            angle = 2.5 * dt * 0.01; 
             angle = angle % 360;
 
-            // mat4.rotateY(out, a, rad)
-            glMatrix.mat4.rotateY(modelMatrix, modelMatrix, glMatrix.glMatrix.toRadian(angle)); // Rotate 90 deg around Y
+            //glMatrix.mat4.rotateY(modelMatrix, modelMatrix, glMatrix.glMatrix.toRadian(angle)); // Rotate 90 deg around Y
         }
 
         /**
@@ -380,7 +427,14 @@
                     loadOp: "clear",
                     clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
                     storeOp: "store",
-                }]
+                }],
+                // AQUÍ ACTIVAS LA PROFUNDIDAD EN EL RENDER
+                depthStencilAttachment: {
+                    view: depthTexture.createView(),
+                    depthClearValue: 1.0, // 1.0 es el punto más lejano
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                }
             });
 
             pass.setPipeline(colorPipeline.getWebGPUPipeline());
@@ -388,13 +442,16 @@
             pass.setBindGroup(1, modelBindGroup);
             pass.setVertexBuffer(0, vertexBuffer);
             pass.setIndexBuffer(indexBuffer, 'uint16');
-            pass.drawIndexed(24);
+            //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
+            pass.drawIndexed(indices.length, 1, 0, 0, 0);
             pass.end();
 
             const commandBuffer = encoder.finish();
 
-            pGraphics.device.queue.writeBuffer(cameraBuffer, 0, viewMatrix);
-            pGraphics.device.queue.writeBuffer(cameraBuffer, 16 * 4, projectionMatrix);
+            pGraphics.device.queue.writeBuffer(vertexBuffer, 0, vertices, 0, vertices.length);
+            pGraphics.device.queue.writeBuffer(indexBuffer, /*bufferOffset=*/0, indices, 0, indices.length);
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
             pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
             // Finish the command buffer and immediately submit it.
