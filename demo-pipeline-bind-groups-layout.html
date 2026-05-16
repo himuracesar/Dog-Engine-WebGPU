@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dog WebGPU - Demo Pipeline</title>
+    <title>Dog WebGPU - Demo Pipeline with Bind Groups Layout</title>
 
     <style>
         :root {
@@ -149,6 +149,7 @@
 
         var modelMatrix;
         var modelBuffer;
+        var modelBindGroupLayout;
         var modelBindGroup;
 
         var depthTexture;
@@ -219,7 +220,11 @@
         }
 
         function createPipeline(){
-            colorPipeline = new ColorPipeline();
+            var bgl = [];
+            bgl.push(camera.getBindGroupLayout());
+            bgl.push(modelBindGroupLayout);
+
+            colorPipeline = new ColorPipeline(bgl);
 
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
@@ -237,6 +242,7 @@
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
+            /*
             bindGroup = pGraphics.device.createBindGroup({
                 layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
                 entries: [{
@@ -244,8 +250,9 @@
                     resource: { buffer: camera.getUniformBuffer() }
                 }],
             });
+            */
 
-            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
+            modelBindGroupLayout = pGraphics.device.createBindGroupLayout({
                 entries: [{
                     binding: 0,                           
                     visibility: GPUShaderStage.VERTEX, 
@@ -256,7 +263,7 @@
             });
 
             modelBindGroup = pGraphics.device.createBindGroup({
-                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(1),
+                layout: modelBindGroupLayout, //colorPipeline.getWebGPUPipeline().getBindGroupLayout(1),
                 entries: [{
                     binding: 0,
                     resource: { buffer: modelBuffer }
@@ -286,8 +293,8 @@
             camera.setFarPlane(4000.0);
 
             createShapes();
-            createPipeline();
             createMatrices();
+            createPipeline();
 
             requestAnimationFrame(updateAndRender);
         }
@@ -410,7 +417,7 @@
             });
 
             pass.setPipeline(colorPipeline.getWebGPUPipeline());
-            pass.setBindGroup(0, bindGroup);
+            pass.setBindGroup(0, camera.getBindGroup());
             pass.setBindGroup(1, modelBindGroup);
             pass.setVertexBuffer(0, vertexBuffer);
             pass.setIndexBuffer(indexBuffer, 'uint16');

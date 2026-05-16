@@ -4,7 +4,14 @@
  * @version 1.0
  */
 class Camera {
-
+    /**
+     * Create a camera with default values. The camera is located in the origin of the world and looks to the negative z axis. 
+     * The up vector is the positive y axis and the right vector is the positive x axis. The field of view is 60 degrees, 
+     * the aspect ratio is the width of the canvas divided by the height of the canvas, the near plane is 0.1 and the far plane 
+     * is 1000. The speed to move is 0.1 and the speed to rotate is 0.005.
+     * The camera also creates a uniform buffer to store the view and projection matrices, a bind group layout and a bind group 
+     * to bind the uniform buffer to the shader.
+     */
     constructor(){
         this.position = [0.0, 0.0, 0.0];
         this.up = [0.0, 1.0, 0.0, 0.0];
@@ -22,6 +29,7 @@ class Camera {
         this.velocity = [0.0, 0.0, 0.0];
 
         this.uniformBuffer = this.createUniformBuffer();
+        this.bindGroupLayout = this.createBindGroupLayout();
         this.bindGroup = this.createBindGroup();
     }
 
@@ -38,7 +46,7 @@ class Camera {
 
     /**
      * Compute the view matrix o view space. This space is the camera space
-     * @returns {Matrix4} View Matrix
+     * @returns {Matrix4} View Matrix or Camera Matrix.
      */
     getViewMatrix(){
         this.position[0] += this.velocity[0];
@@ -234,11 +242,11 @@ class Camera {
     }
 
     /**
-     * Create the bind group for the camera. First create the bind group layout and then create 
-     * the bind group with the uniform buffer of the camera.
-     * @returns {GPUBindGroup} Bind group for the camera.
+     * Create the bind group layout for the camera. The bind group layout defines the layout of the bind group, 
+     * which is used to bind the uniform buffer to the shader.
+     * @returns {GPUBindGroupLayout} Bind group layout for the camera.
      */
-    createBindGroup(){
+    createBindGroupLayout(){
         const bindGroupLayout = pGraphics.device.createBindGroupLayout({
             entries: [{
                 binding: 0,                           // Same index as in the bindGroup
@@ -249,8 +257,17 @@ class Camera {
             }]
         });
 
+        return bindGroupLayout;
+    }
+
+    /**
+     * Create the bind group for the camera. First create the bind group layout and then create 
+     * the bind group with the uniform buffer of the camera.
+     * @returns {GPUBindGroup} Bind group for the camera.
+     */
+    createBindGroup(){
         const bindGroup = pGraphics.device.createBindGroup({
-            layout: bindGroupLayout,
+            layout: this.bindGroupLayout,
             entries: [{
                 binding: 0,
                 resource: { buffer: this.uniformBuffer }
@@ -274,5 +291,13 @@ class Camera {
      */
     getUniformBuffer(){
         return this.uniformBuffer;
+    }
+
+    /**
+     * Get the bind group layout of the camera.
+     * @returns {GPUBindGroupLayout} Bind group layout of the camera.
+     */
+    getBindGroupLayout(){
+        return this.bindGroupLayout;
     }
 }
