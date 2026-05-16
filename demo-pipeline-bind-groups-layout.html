@@ -137,9 +137,6 @@
         
         var angle = 0.0;
 
-        var vertices;
-        var indices;
-
         var vertexBuffer;
         var indexBuffer;
 
@@ -157,7 +154,7 @@
         //------------------- Demo's main functions -------------------
         function createShapes(){
             // position (3), color (4)
-            vertices = new Float32Array([
+            const vertices = new Float32Array([
                 //Front
                 -1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //0
                  1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //1
@@ -190,7 +187,7 @@
                 -1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0  //23
             ]);
 
-            indices = new Uint16Array([
+            const indices = new Uint16Array([
                 //Back
                 0, 1, 2, 0, 2, 3,
                 //Right
@@ -217,6 +214,9 @@
                 size: indices.byteLength,
                 usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
             });
+
+            pGraphics.device.queue.writeBuffer(vertexBuffer, 0, vertices, 0, vertices.length);
+            pGraphics.device.queue.writeBuffer(indexBuffer, /*bufferOffset=*/0, indices, 0, indices.length);
         }
 
         function createPipeline(){
@@ -241,16 +241,6 @@
                 size: modelBufferSize,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
-
-            /*
-            bindGroup = pGraphics.device.createBindGroup({
-                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
-                entries: [{
-                    binding: 0,
-                    resource: { buffer: camera.getUniformBuffer() }
-                }],
-            });
-            */
 
             modelBindGroupLayout = pGraphics.device.createBindGroupLayout({
                 entries: [{
@@ -416,22 +406,20 @@
                 }
             });
 
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
+
             pass.setPipeline(colorPipeline.getWebGPUPipeline());
             pass.setBindGroup(0, camera.getBindGroup());
             pass.setBindGroup(1, modelBindGroup);
             pass.setVertexBuffer(0, vertexBuffer);
             pass.setIndexBuffer(indexBuffer, 'uint16');
             //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
-            pass.drawIndexed(indices.length, 1, 0, 0, 0);
+            pass.drawIndexed(36, 1, 0, 0, 0);
             pass.end();
 
             const commandBuffer = encoder.finish();
-
-            pGraphics.device.queue.writeBuffer(vertexBuffer, 0, vertices, 0, vertices.length);
-            pGraphics.device.queue.writeBuffer(indexBuffer, /*bufferOffset=*/0, indices, 0, indices.length);
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
-            pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
             // Finish the command buffer and immediately submit it.
             pGraphics.device.queue.submit([commandBuffer]);
