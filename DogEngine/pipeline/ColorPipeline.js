@@ -8,8 +8,12 @@
  * @version 1.0
  */
 class ColorPipeline extends DogPipeline {
-
-    constructor(){
+    /**
+     * Creates a new ColorPipeline instance.
+     * @param {GPUBindGroupLayout[]} bindGroupLayouts List of bind group layouts to be used in the pipeline. 
+     * The first layout should be for the camera uniform buffer,
+     */
+    constructor(bindGroupLayouts = []) {
         const shader =  `
             struct VertexOutput {
                 @builtin(position) Position : vec4<f32>,
@@ -48,6 +52,6 @@ class ColorPipeline extends DogPipeline {
 
         let vertexLayout = { "position" : 3, "color" : 4 };
 
-        super("Color", shader, vertexLayout);
+        super("Color", shader, vertexLayout, bindGroupLayouts);
     }
 }
