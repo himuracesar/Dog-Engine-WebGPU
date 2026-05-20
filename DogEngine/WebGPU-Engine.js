@@ -19,9 +19,13 @@ function include(file) {
 }
 
 //----------- Include other js files here ----------------
+include("/DogEngine/DogTransform.js");
+include("/DogEngine/DogMesh.js");
+include("/DogEngine/DogResource.js");
+include("/DogEngine/DogBuffer.js");
+include("/DogEngine/DogResourceManager.js");
 include("/DogEngine/input/KeyCode.js");
 //-------------------------------------------------------
-
 
 //----------- Enums and global variables here ----------------
 /**
@@ -49,6 +53,12 @@ const FrontFaceMode = Object.freeze({
     Ccw: "ccw",
     Cw: "cw"
 });
+
+const BufferType = Object.freeze({
+    Vertex: "vertex",
+    Index: "index"
+});
+
 //------------------------------------------------------------
 
 (function(root, factory){

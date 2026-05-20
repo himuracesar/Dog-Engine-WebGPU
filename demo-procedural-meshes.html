@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dog WebGPU - Demo Pipeline with Bind Groups Layout</title>
+    <title>Dog WebGPU - Demo Procedural Meshes</title>
 
     <style>
         :root {
@@ -95,7 +95,6 @@
         const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
         paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
 
-
         // Send data to the engine
         function emitUI() {
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
@@ -115,6 +114,8 @@
     <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
 
     <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/ColorPipeline.js"></script>
 </head>
@@ -137,101 +138,36 @@
         
         var angle = 0.0;
 
-        var vertexBuffer;
-        var indexBuffer;
-
         var colorPipeline;
 
         var camera;
 
+        var resourceManager;
+
+        var cube;
+
         var modelMatrix;
         var modelBuffer;
-        var modelBindGroupLayout;
         var modelBindGroup;
 
         var depthTexture;
 
         //------------------- Demo's main functions -------------------
         function createShapes(){
-            // position (3), color (4)
-            const vertices = new Float32Array([
-                //Front
-                -1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //0
-                 1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //1
-                 1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //2
-                -1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //3
-                //Right
-                1.0, -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //4
-                1.0, -1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //5
-                1.0,  1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //6
-                1.0,  1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //7
-                //Back
-                 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //8
-                -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //9
-                -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //10
-                 1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //11
-                //Left
-                -1.0, -1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //12
-                -1.0, -1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //13
-                -1.0,  1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //14
-                -1.0,  1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //15
-                //Top
-                -1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //16
-                 1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //17
-                 1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //18
-                -1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //19
-                //Bottom
-                -1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //20
-                 1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //21
-                 1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0, //22
-                -1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0  //23
-            ]);
+            const shape = new DogShape();
+            
+            var descriptor = {};
+            descriptor.width = 50.0;
+            descriptor.height = 50.0;
+            descriptor.depth = 50.0;
+            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Box;
 
-            const indices = new Uint16Array([
-                //Back
-                0, 1, 2, 0, 2, 3,
-                //Right
-                4, 5, 6, 4, 6, 7,
-                //Front
-                8, 9, 10, 8, 10, 11,
-                //Left
-                12, 13, 14, 12, 14, 15,
-                //Top
-                //16, 17, 18, 16, 18, 19,
-                16, 17, 18, 16, 18, 19,
-                //Bottom
-                20, 21, 22, 20, 22, 23
-            ]);
-
-            vertexBuffer = pGraphics.device.createBuffer({
-                label: "vertex positions",
-                size: vertices.byteLength,
-                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-                mappedAtCreation: true, // Ask access immediately to the memory
-            });
-
-            indexBuffer = pGraphics.device.createBuffer({
-                label: "index buffer",
-                size: indices.byteLength,
-                usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-                mappedAtCreation: true, // Ask access immediately to the memory
-            });
-
-            new Float32Array(vertexBuffer.getMappedRange()).set(vertices);
-            // Close the access. Now the data lives 100% on the GPU
-            vertexBuffer.unmap();
-
-            new Uint16Array(indexBuffer.getMappedRange()).set(indices);
-            // Close the access. Now the data lives 100% on the GPU
-            indexBuffer.unmap();
+            cube = shape.createCube(descriptor);
+            debugger;
         }
 
         function createPipeline(){
-            var bgl = [];
-            bgl.push(camera.getBindGroupLayout());
-            bgl.push(modelBindGroupLayout);
-
-            colorPipeline = new ColorPipeline(bgl);
+            colorPipeline = new ColorPipeline();
 
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
@@ -249,7 +185,15 @@
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
-            modelBindGroupLayout = pGraphics.device.createBindGroupLayout({
+            bindGroup = pGraphics.device.createBindGroup({
+                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
+                entries: [{
+                    binding: 0,
+                    resource: { buffer: camera.getUniformBuffer() }
+                }],
+            });
+
+            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
                 entries: [{
                     binding: 0,                           
                     visibility: GPUShaderStage.VERTEX, 
@@ -260,7 +204,7 @@
             });
 
             modelBindGroup = pGraphics.device.createBindGroup({
-                layout: modelBindGroupLayout, //colorPipeline.getWebGPUPipeline().getBindGroupLayout(1),
+                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(1),
                 entries: [{
                     binding: 0,
                     resource: { buffer: modelBuffer }
@@ -289,9 +233,11 @@
             camera.setSpeed(0.2);
             camera.setFarPlane(4000.0);
 
+            resourceManager = new DogResourceManager();
+
             createShapes();
-            createMatrices();
             createPipeline();
+            createMatrices();
 
             requestAnimationFrame(updateAndRender);
         }
@@ -417,16 +363,17 @@
             pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
             pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
-            pass.setPipeline(colorPipeline.getWebGPUPipeline());
-            pass.setBindGroup(0, camera.getBindGroup());
+            /*pass.setPipeline(colorPipeline.getWebGPUPipeline());
+            pass.setBindGroup(0, bindGroup);
             pass.setBindGroup(1, modelBindGroup);
             pass.setVertexBuffer(0, vertexBuffer);
             pass.setIndexBuffer(indexBuffer, 'uint16');
             //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
-            pass.drawIndexed(36, 1, 0, 0, 0);
+            pass.drawIndexed(36, 1, 0, 0, 0);*/
             pass.end();
 
             const commandBuffer = encoder.finish();
+
 
             // Finish the command buffer and immediately submit it.
             pGraphics.device.queue.submit([commandBuffer]);
