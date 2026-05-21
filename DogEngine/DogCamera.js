@@ -75,7 +75,7 @@ class DogCamera {
 
         var mInverse = glMatrix.mat4.create();
         glMatrix.mat4.invert(mInverse, mView);
-
+        
         return mInverse;
     }
 

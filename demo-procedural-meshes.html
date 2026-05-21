@@ -117,7 +117,7 @@
     <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
     <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
-    <script type="text/javascript" src="/DogEngine/pipeline/ColorPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/NormalColorPipeline.js"></script>
 </head>
 <body onload="init();">
     <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
@@ -138,17 +138,17 @@
         
         var angle = 0.0;
 
-        var colorPipeline;
+        var normalColorPipeline;
 
         var camera;
 
         var resourceManager;
 
         var cube;
-
-        var modelMatrix;
-        var modelBuffer;
-        var modelBindGroup;
+        var sphere;
+        var grid;
+        var cylinder;
+        var torus;
 
         var depthTexture;
 
@@ -163,52 +163,59 @@
             //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Box;
 
             cube = shape.createCube(descriptor);
-            debugger;
+
+            descriptor = {};
+            descriptor.radio = 25.0;
+            descriptor.slices = 20;
+            descriptor.stacks = 20;
+            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Sphere;
+
+            sphere = shape.createSphere(descriptor);
+
+            descriptor = {};
+            descriptor.delta = [100.0, 0.0, 100.0];
+            descriptor.numVertRows = 50;
+            descriptor.numVertCols = 50;
+            descriptor.position = [0.0, 0.0, 0.0];
+            descriptor.texScale = 1.0;
+            
+            grid = shape.createGrid(descriptor);
+
+            descriptor = {};
+            descriptor.slices = 10;
+            descriptor.stacks = 10;
+            descriptor.bottomRadio = 20.0;
+            descriptor.topRadio = 20.0;
+            descriptor.height = 100.0;
+            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Box;
+
+            cylinder = shape.createCylinder(descriptor);
+
+            descriptor = {};
+            descriptor.radio = 30.0;
+            descriptor.tuberadio = 10.0;
+            descriptor.radialSegments = 32;
+            descriptor.tubularSegments = 16;
+
+            torus = shape.createTorus(descriptor);
+
+            sphere.getTransform().translateAbsolute(100.0, 25.0, 0.0);
+            cube.getTransform().translateAbsolute(0.0, 25.0, 0.0);
+            cylinder.getTransform().translateAbsolute(-100.0, 50.0, 0.0);
+            torus.getTransform().translateAbsolute(0.0, 25.0, -100.0);
         }
 
         function createPipeline(){
-            colorPipeline = new ColorPipeline();
+            var bindGroupLayouts = [];
+            bindGroupLayouts.push(camera.getBindGroupLayout());
+            bindGroupLayouts.push(cube.getTransform().getBindGroupLayout());
+
+            normalColorPipeline = new NormalColorPipeline(bindGroupLayouts);
 
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
                 format: 'depth24plus',
                 usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            });
-        }
-
-        function createMatrices(){
-            modelMatrix = glMatrix.mat4.create(); // Identity matrix
-
-            const modelBufferSize = 16 * 4; // Matrix4x4 has 16 floats, each float is 4 bytes
-            modelBuffer = pGraphics.device.createBuffer({
-                size: modelBufferSize,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-
-            bindGroup = pGraphics.device.createBindGroup({
-                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
-                entries: [{
-                    binding: 0,
-                    resource: { buffer: camera.getUniformBuffer() }
-                }],
-            });
-
-            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
-                entries: [{
-                    binding: 0,                           
-                    visibility: GPUShaderStage.VERTEX, 
-                    buffer: {
-                        type: "uniform"
-                    }
-                }]
-            });
-
-            modelBindGroup = pGraphics.device.createBindGroup({
-                layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(1),
-                entries: [{
-                    binding: 0,
-                    resource: { buffer: modelBuffer }
-                }],
             });
         }
 
@@ -229,15 +236,14 @@
             canvas.onmousemove = event => this.onMouseMove(event);
 
             camera = new DogCamera();
-            camera.setPosition([0.0, 0.0, 5.0]);
-            camera.setSpeed(0.2);
+            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setSpeed(1.3);
             camera.setFarPlane(4000.0);
 
             resourceManager = new DogResourceManager();
 
             createShapes();
             createPipeline();
-            createMatrices();
 
             requestAnimationFrame(updateAndRender);
         }
@@ -331,6 +337,12 @@
 
             input();
 
+            cube.update(dt);
+            sphere.update(dt);
+            grid.update(dt);
+            cylinder.update(dt);
+            torus.update(dt);
+
             angle = 2.5 * dt * 0.01; 
             angle = angle % 360;
 
@@ -361,15 +373,16 @@
 
             pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
             pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
-            pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
-            /*pass.setPipeline(colorPipeline.getWebGPUPipeline());
-            pass.setBindGroup(0, bindGroup);
-            pass.setBindGroup(1, modelBindGroup);
-            pass.setVertexBuffer(0, vertexBuffer);
-            pass.setIndexBuffer(indexBuffer, 'uint16');
-            //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
-            pass.drawIndexed(36, 1, 0, 0, 0);*/
+            pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
+            pass.setBindGroup(0, camera.getBindGroup());
+
+            cube.render(pass);
+            sphere.render(pass);
+            grid.render(pass);
+            cylinder.render(pass);
+            torus.render(pass);
+            
             pass.end();
 
             const commandBuffer = encoder.finish();

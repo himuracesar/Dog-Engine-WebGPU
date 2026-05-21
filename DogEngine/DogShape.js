@@ -5,10 +5,16 @@
  *  + Sphere
  *  + Grid
  *  + Cylinder
+ * The resource manager is used to store the vertex and index buffers of the meshes, so they can be reused in different static meshes.
+ * So the resource manager must be declared and initialized before creating the meshes in the main function.
  * @author César Himura
  * @version 1.0
  */
 class DogShape {
+    /**
+     * Creates a new DogShape instance. This class is not meant to be instantiated, 
+     * but to be used as a static class to create procedural meshes.
+     */
     constructor(){
 
     }
@@ -95,8 +101,6 @@ class DogShape {
         staticMesh.setIdVertexBuffer(vertexBuffer.getId());
         staticMesh.setIdIndexBuffer(indexBuffer.getId());
 
-        //var mesh = webGLengine.createMesh(gl, _vertices, indices, vertexFormat);
-
         //Calculate smooth normals for outline rendering
         //var smoothNormals = webGLengine.calculateSmoothNormals(_vertices, indices);
 
@@ -159,7 +163,7 @@ class DogShape {
                 _vertices.push(verts[2]);
                 //normal
                 var normal = [verts[0], verts[1], verts[2]];
-                normal = m4.normalize(normal);
+                glMatrix.vec3.normalize(normal, normal);
                 _vertices.push(normal[0]);
                 _vertices.push(normal[1]);
                 _vertices.push(normal[2]);
@@ -238,13 +242,30 @@ class DogShape {
         var indices = new Uint16Array(_indices);
 
         let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+
+        const idVb = "DogSphereVB" + new Date().getTime();
+        const idIb = "DogSphereIB" + new Date().getTime();
+        const vertexBuffer = new DogBuffer(idVb, BufferType.Vertex, vertices);
+        const indexBuffer = new DogBuffer(idIb, BufferType.Index, indices);
+
+        resourceManager.add(idVb, vertexBuffer);
+        resourceManager.add(idIb, indexBuffer);
+
+        var mesh = new DogMesh();
+        mesh.setNumVertices(_vertices.length / 8);
+        mesh.setNumIndices(indices.length);
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.addMesh(mesh);
+        staticMesh.setIdVertexBuffer(vertexBuffer.getId());
+        staticMesh.setIdIndexBuffer(indexBuffer.getId());
         //var mesh = webGLengine.createMesh(gl, vertices, indices, vertexFormat);
 
         /*if(descriptor.boundingVolumeType === BoundingVolumeEnums.Type.Sphere){
             mesh.submeshes[0].setBoundingVolume(new BoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
         } */
 
-        return mesh;
+        return staticMesh;
     }
 
     /**
@@ -317,10 +338,27 @@ class DogShape {
         var vertices = new Float32Array(_vertices);
         var indices = new Uint16Array(_indices);
 
-        let vertexFormat = { "in_position" : 3, "in_normal" : 3,  "in_texcoord" : 2 };
+        let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+
+        const idVb = "DogGridVB" + new Date().getTime();
+        const idIb = "DogGridIB" + new Date().getTime();
+        const vertexBuffer = new DogBuffer(idVb, BufferType.Vertex, vertices);
+        const indexBuffer = new DogBuffer(idIb, BufferType.Index, indices);
+
+        resourceManager.add(idVb, vertexBuffer);
+        resourceManager.add(idIb, indexBuffer);
+
+        var mesh = new DogMesh();
+        mesh.setNumVertices(_vertices.length / 8);
+        mesh.setNumIndices(indices.length);
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.addMesh(mesh);
+        staticMesh.setIdVertexBuffer(vertexBuffer.getId());
+        staticMesh.setIdIndexBuffer(indexBuffer.getId());
         //var mesh = webGLengine.createMesh(gl, vertices, indices, vertexFormat);
 
-        return mesh;
+        return staticMesh;
     }
 
     /**
@@ -389,8 +427,8 @@ class DogShape {
                 _vertices.push(y);
                 _vertices.push(r * s);
 
-                vmin = webGLengine.Vector3Min(vmin, [r * c, y, r * s]);
-                vmax = webGLengine.Vector3Max(vmax, [r * c, y, r * s]);
+                //vmin = webGLengine.Vector3Min(vmin, [r * c, y, r * s]);
+                //vmax = webGLengine.Vector3Max(vmax, [r * c, y, r * s]);
 
                 // This is unit length.
                 var T = [-s, 0.0, c];
@@ -398,8 +436,9 @@ class DogShape {
                 var dr = descriptor.bottomRadio - descriptor.topRadio;
                 var B = [dr * c, -descriptor.height, dr * s];
 
-                var normal = m4.cross(T, B);
-                normal = m4.normalize(normal);
+                var normal = glMatrix.vec3.create();
+                glMatrix.vec3.cross(normal, T, B);
+                glMatrix.vec3.normalize(normal, normal);
 
                 //normal
                 _vertices.push(normal[0]);
@@ -455,6 +494,23 @@ class DogShape {
         var indices = new Uint16Array(_indices);
 
         let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+
+        const idVb = "DogCylinderVB" + new Date().getTime();
+        const idIb = "DogCylinderIB" + new Date().getTime();
+        const vertexBuffer = new DogBuffer(idVb, BufferType.Vertex, vertices);
+        const indexBuffer = new DogBuffer(idIb, BufferType.Index, indices);
+
+        resourceManager.add(idVb, vertexBuffer);
+        resourceManager.add(idIb, indexBuffer);
+
+        var mesh = new DogMesh();
+        mesh.setNumVertices(_vertices.length / 8);
+        mesh.setNumIndices(indices.length);
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.addMesh(mesh);
+        staticMesh.setIdVertexBuffer(vertexBuffer.getId());
+        staticMesh.setIdIndexBuffer(indexBuffer.getId());
         //var mesh = webGLengine.createMesh(gl, vertices, indices, vertexFormat);
 
         //Calculate smooth normals for outline rendering
@@ -467,7 +523,7 @@ class DogShape {
             mesh.submeshes[0].setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
         }*/
 
-        return mesh;
+        return staticMesh;
     }
 
     /**
@@ -586,5 +642,81 @@ class DogShape {
             indices.push(baseIndex + i);
             indices.push(baseIndex + i + 1);
         }
+    }
+
+    /**
+     * Create a torus mesh. The mesh is centered in the middle of the torus.
+     * @param {JSON Object} descriptor - Object with the following properties: radio, tuberadio, radialSegments, tubularSegments.
+     * @param {float} descriptor.radio - Radio of the torus.
+     * @param {float} descriptor.tuberadio - Radio of the tube of the torus.
+     * @param {int} descriptor.radialSegments - Number of segments in the radial direction.
+     * @param {int} descriptor.tubularSegments - Number of segments in the tubular direction.
+     * @returns {DogStaticMesh} Torus with vertex format { position: 3, normal: 3, texture coords: 2 }
+     */
+    createTorus(descriptor){
+        var _vertices = []; // Almacenará: [x, y, z, nx, ny, nz, u, v, ...]
+        var _indices = [];
+
+        // Generar vértices con normales y UVs
+        for (let j = 0; j <= descriptor.radialSegments; j++) {
+            for (let i = 0; i <= descriptor.tubularSegments; i++) {
+                const u = (i / descriptor.tubularSegments) * Math.PI * 2;
+                const v = (j / descriptor.radialSegments) * Math.PI * 2;
+
+                // 1. Position
+                const x = (descriptor.radio + descriptor.tuberadio * Math.cos(v)) * Math.cos(u);
+                const z = (descriptor.radio + descriptor.tuberadio * Math.cos(v)) * Math.sin(u);
+                const y = descriptor.tuberadio * Math.sin(v);
+
+                // 2. Normals
+                // The vector from the center of the cross-section to the vertex
+                const nx = Math.cos(v) * Math.cos(u);
+                const nz = Math.cos(v) * Math.sin(u);
+                const ny = Math.sin(v);
+
+                // 3. UVs
+                const tu = i / descriptor.tubularSegments;
+                const tv = j / descriptor.radialSegments;
+
+                _vertices.push(x, y, z, nx, ny, nz, tu, tv);
+            }
+        }
+
+        // Indices
+        for (let j = 1; j <= descriptor.radialSegments; j++) {
+            for (let i = 1; i <= descriptor.tubularSegments; i++) {
+                const a = (descriptor.tubularSegments + 1) * j + i - 1;
+                const b = (descriptor.tubularSegments + 1) * (j - 1) + i - 1;
+                const c = (descriptor.tubularSegments + 1) * (j - 1) + i;
+                const d = (descriptor.tubularSegments + 1) * j + i;
+
+                _indices.push(a, b, d);
+                _indices.push(b, c, d);
+            }
+        }
+
+        var vertices = new Float32Array(_vertices);
+        var indices = new Uint16Array(_indices);
+
+        let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+
+        const idVb = "DogTorusVB" + new Date().getTime();
+        const idIb = "DogTorusIB" + new Date().getTime();
+        const vertexBuffer = new DogBuffer(idVb, BufferType.Vertex, vertices);
+        const indexBuffer = new DogBuffer(idIb, BufferType.Index, indices);
+
+        resourceManager.add(idVb, vertexBuffer);
+        resourceManager.add(idIb, indexBuffer);
+
+        var mesh = new DogMesh();
+        mesh.setNumVertices(_vertices.length / 8);
+        mesh.setNumIndices(_indices.length);
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.addMesh(mesh);
+        staticMesh.setIdVertexBuffer(vertexBuffer.getId());
+        staticMesh.setIdIndexBuffer(indexBuffer.getId());
+
+        return staticMesh;
     }
 }

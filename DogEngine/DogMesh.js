@@ -6,11 +6,39 @@ class DogMesh {
         this.idParent = -1;
         this.boundingVolume = null;
         this.idMaterial = -1;
+        this.forward = [0.0, 0.0, -1.0, 0.0];
+        this.up = [0.0, 1.0, 0.0, 0.0];
+        this.right = [1.0, 0.0, 0.0, 0.0];
+    }
+
+    /**
+     * Update the mesh. This method can be used to update the transform of the mesh or any 
+     * other property that needs to be updated every frame.
+     * @param {float} deltaTime 
+     */
+    update(deltaTime){
+        
     }
 
     render(pass){
+        pGraphics.device.queue.writeBuffer(this.transform.getUniformBuffer(), 0, this.transform.getTransformMatrix());
+
+        pass.setBindGroup(1, this.transform.getBindGroup());
          //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
         pass.drawIndexed(this.numIndices, 1, 0, 0, 0);
+    }
+
+    /**
+     * Update the transformation of the mesh. This method should be called after updating 
+     * the transform of the mesh to apply the changes to the model matrix.
+     * @param {Matrix4x4} spaceParent Matrix of the parent space to which the mesh belongs. This is used to calculate 
+     * the final model matrix of the mesh by multiplying it with the local transform matrix of the mesh.
+     */
+    updateTransformation(spaceParent){
+        const mModel = this.transform.getTransformMatrix();
+        glMatrix.mat4.multiply(mModel, spaceParent, mModel);
+
+        this.getTransform().setTransformMatrix(mModel);
     }
 
     /**

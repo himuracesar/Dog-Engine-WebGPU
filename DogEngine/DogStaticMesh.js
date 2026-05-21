@@ -12,7 +12,20 @@ class DogStaticMesh {
         this.right = [1.0, 0.0, 0.0, 0.0];
     }
 
+    update(deltaTime){
+        for(var i = 0; i < this.meshes.length; i++){
+            this.meshes[i].update(deltaTime);
+
+            if(this.getTransform().hasChanged()) {
+                this.meshes[i].updateTransformation(this.transform.getTransformMatrix());
+            }
+        }
+    }
+
     render(pass){
+        pass.setVertexBuffer(0, resourceManager.get(this.idVertexBuffer).getWebGPUBuffer());
+        pass.setIndexBuffer(resourceManager.get(this.idIndexBuffer).getWebGPUBuffer(), 'uint16');
+
         for(var i = 0; i < this.meshes.length; i++){
             this.meshes[i].render(pass);
         }
@@ -40,5 +53,13 @@ class DogStaticMesh {
      */
     setIdIndexBuffer(idIndexBuffer){
         this.idIndexBuffer = idIndexBuffer;
+    }
+
+    /**
+     * Gets the transform of the static mesh.
+     * @returns {DogTransform} The transform of the static mesh.
+     */
+    getTransform(){
+        return this.transform;
     }
 }

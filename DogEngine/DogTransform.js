@@ -13,6 +13,19 @@ class DogTransform {
      */
     constructor(){
         this.resetTransform();
+
+        this.translation = glMatrix.vec3.create();
+        this.scaling = glMatrix.vec3.create();
+        this.rotation = glMatrix.quat.create();
+        this.rotationEuler = glMatrix.vec3.create();
+
+        this.lastPosition = glMatrix.vec3.create();
+        this.lastScale = glMatrix.vec3.create();
+        this.lastRotation = glMatrix.quat.create();
+
+        this.uniformBuffer = this.createUniformBuffer();
+        this.bindGroupLayout = this.createBindGroupLayout();
+        this.bindGroup = this.createBindGroup();
     }
 
     /**
@@ -20,8 +33,8 @@ class DogTransform {
      * Also resets the model matrix to the identity matrix.
      */
     resetTransform() {
-        this.position = [0.0, 0.0, 0.0];
-        this.scale = [1.0, 1.0, 1.0];
+        this.position = [0.0, 0.0, 0.0, 1.0];
+        this.scale = [1.0, 1.0, 1.0, 1.0];
         this.yRotation = 0.0;
         this.xRotation = 0.0;
         this.zRotation = 0.0;
@@ -126,11 +139,26 @@ class DogTransform {
     }
 
     /**
+     * Check if the transform has changed since the last time it was updated. 
+     * This is used to determine if the model matrix needs to be recalculated.
+     * @returns {boolean} True if the transform has changed, false otherwise.
+     */
+    hasChanged() {
+        return this.position[0] != this.lastPosition[0] || this.position[1] != this.lastPosition[1] || this.position[2] != this.lastPosition[2] ||
+               this.scale[0] != this.lastScale[0] || this.scale[1] != this.lastScale[1] || this.scale[2] != this.lastScale[2] ||
+               this.xRotation != this.lastRotation[0] || this.yRotation != this.lastRotation[1] || this.zRotation != this.lastRotation[2];
+    }
+
+    /**
      * Get the transform matrix. Includes translation, rotation and scale. 
      * The order of transformations is: scale, then rotate, then translate.
      * @returns {Matrix4} The transform matrix of the object.
      */
     getTransformMatrix() {
+        if(!this.hasChanged()) {
+            return this.mModel;
+        }
+
         this.mModel = glMatrix.mat4.create();
         glMatrix.mat4.translate(this.mModel, this.mModel, this.position);
         glMatrix.mat4.rotateY(this.mModel, this.mModel, this.yRotation);
@@ -138,6 +166,122 @@ class DogTransform {
         glMatrix.mat4.rotateZ(this.mModel, this.mModel, this.zRotation);
         glMatrix.mat4.scale(this.mModel, this.mModel, this.scale);
 
+        this.lastPosition[0] = this.position[0];
+        this.lastPosition[1] = this.position[1];
+        this.lastPosition[2] = this.position[2];
+        this.lastScale[0] = this.scale[0];
+        this.lastScale[1] = this.scale[1];
+        this.lastScale[2] = this.scale[2];
+        this.lastRotation[0] = this.xRotation;
+        this.lastRotation[1] = this.yRotation;
+        this.lastRotation[2] = this.zRotation;
+
         return this.mModel;
+    }
+
+    /**
+     * Sets the transform matrix directly. This can be used to set the transform matrix from an 
+     * external source, such as a file or a network message.
+     * @param {Matrix4x4} mModel Matrix4x4 to set as the transform matrix of the object.
+     */
+    setTransformMatrix(mModel) {
+        this.mModel = mModel;
+
+        glMatrix.mat4.getTranslation(this.translation, this.mModel);
+        glMatrix.mat4.getScaling(this.scaling, this.mModel);
+        glMatrix.mat4.getRotation(this.rotation, this.mModel);
+
+        this.translateRelative(this.translation[0], this.translation[1], this.translation[2]);
+        this.scaleRelative(this.scaling[0], this.scaling[1], this.scaling[2]);
+
+        this.lastPosition[0] = this.position[0];
+        this.lastPosition[1] = this.position[1];
+        this.lastPosition[2] = this.position[2];
+        this.lastScale[0] = this.scale[0];
+        this.lastScale[1] = this.scale[1];
+        this.lastScale[2] = this.scale[2];
+        this.lastRotation[0] = this.xRotation;
+        this.lastRotation[1] = this.yRotation;
+        this.lastRotation[2] = this.zRotation;
+
+        /*debugger;
+        glMatrix.quat.getEuler(this.rotationEuler, this.rotation);*/
+    }
+
+    //-------------------------- WebGPU related methods -------------------------//
+
+    /**
+     * Creates a uniform buffer for the model matrix. This buffer can be used to send the model matrix to the GPU.
+     * @returns {GPUBuffer} A GPU buffer that can be used as a uniform buffer for the model matrix.
+     */
+    createUniformBuffer(){
+        const bufferSize = 16 * 4; // Matrix4x4 has 16 floats, each float is 4 bytes
+        const buffer = pGraphics.device.createBuffer({
+            size: bufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        
+        return buffer;
+    }
+
+    /**
+     * Creates a bind group layout for the model matrix. This layout can be used to create a bind group that includes the model matrix uniform buffer.
+     * @returns {GPUBindGroupLayout} A bind group layout for the model matrix uniform buffer.
+     */
+    createBindGroupLayout(){
+        const bindGroupLayout = pGraphics.device.createBindGroupLayout({
+            entries: [{
+                binding: 0,                           // Same index as in the bindGroup
+                visibility: GPUShaderStage.VERTEX,    // In which stages is visible
+                buffer: {
+                    type: "uniform"                     // uniform buffer (default)
+                }
+            }]
+        });
+
+        return bindGroupLayout;
+    }
+
+    /**
+     * Creates a bind group for the model matrix. This bind group can be used to bind the model matrix 
+     * uniform buffer to the shader.
+     * @returns {GPUBindGroup} A bind group that binds the model matrix uniform buffer to the shader.
+     */
+    createBindGroup(){
+        const bindGroup = pGraphics.device.createBindGroup({
+            layout: this.bindGroupLayout,
+            entries: [{
+                binding: 0,
+                resource: { buffer: this.uniformBuffer }
+            }],
+        });
+
+        return bindGroup;
+    }
+
+    /**
+     * Gets the uniform buffer for the model matrix. This buffer can be used to send the model matrix to the GPU.
+     * @returns {GPUBuffer} The uniform buffer for the model matrix.
+     */
+    getUniformBuffer(){
+        return this.uniformBuffer;
+    }
+
+    /**
+     * Gets the bind group for the model matrix. This bind group can be used to bind the model matrix 
+     * uniform buffer to the shader.
+     * @returns {GPUBindGroup} The bind group that binds the model matrix uniform buffer to the shader.
+     */
+    getBindGroup(){
+        return this.bindGroup;
+    }
+
+    /**
+     * Gets the bind group layout for the model matrix. This bind group layout can be used to create 
+     * a bind group that includes the model matrix uniform buffer.
+     * @returns {GPUBindGroupLayout} The bind group layout for the model matrix uniform buffer.
+     */
+    getBindGroupLayout(){
+        return this.bindGroupLayout;
     }
 }
