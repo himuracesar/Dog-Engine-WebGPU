@@ -114,7 +114,7 @@
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
     <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
 
-    <script type="text/javascript" src="/DogEngine/Camera.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/ColorPipeline.js"></script>
 </head>
@@ -280,7 +280,7 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            camera = new Camera();
+            camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);
             camera.setSpeed(0.2);
             camera.setFarPlane(4000.0);

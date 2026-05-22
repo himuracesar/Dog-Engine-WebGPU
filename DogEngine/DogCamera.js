@@ -3,7 +3,7 @@
  * @author César Himura
  * @version 1.0
  */
-class Camera {
+class DogCamera {
     /**
      * Create a camera with default values. The camera is located in the origin of the world and looks to the negative z axis. 
      * The up vector is the positive y axis and the right vector is the positive x axis. The field of view is 60 degrees, 
@@ -75,7 +75,7 @@ class Camera {
 
         var mInverse = glMatrix.mat4.create();
         glMatrix.mat4.invert(mInverse, mView);
-
+        
         return mInverse;
     }
 
