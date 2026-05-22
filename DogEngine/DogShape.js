@@ -107,9 +107,9 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        /*if(descriptor.boundingVolumeType === BoundingVolumeEnums.Type.Box){
-            mesh.submeshes[0].setBoundingVolume(new BoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
-        } */
+        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
+            mesh.setBoundingVolume(new BoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
+        }
 
         return staticMesh;
     }
@@ -261,9 +261,9 @@ class DogShape {
         staticMesh.setIdIndexBuffer(indexBuffer.getId());
         //var mesh = webGLengine.createMesh(gl, vertices, indices, vertexFormat);
 
-        /*if(descriptor.boundingVolumeType === BoundingVolumeEnums.Type.Sphere){
-            mesh.submeshes[0].setBoundingVolume(new BoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
-        } */
+        if(descriptor.boundingVolumeType === BoundingVolumeType.Sphere){
+            mesh.setBoundingVolume(new BoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
+        } 
 
         return staticMesh;
     }
@@ -427,8 +427,8 @@ class DogShape {
                 _vertices.push(y);
                 _vertices.push(r * s);
 
-                //vmin = webGLengine.Vector3Min(vmin, [r * c, y, r * s]);
-                //vmax = webGLengine.Vector3Max(vmax, [r * c, y, r * s]);
+                glMatrix.vec3.min(vmin, vmin, [r * c, y, r * s]);
+                glMatrix.vec3.max(vmax, vmax, [r * c, y, r * s]);
 
                 // This is unit length.
                 var T = [-s, 0.0, c];
@@ -517,11 +517,11 @@ class DogShape {
         //var smoothNormals = webGLengine.calculateSmoothNormals(_vertices, indices);
 
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
-        mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);
+        mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if(descriptor.boundingVolumeType === BoundingVolumeEnums.Type.Box){
-            mesh.submeshes[0].setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
-        }*/
+        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
+            mesh.setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
+        }
 
         return staticMesh;
     }
@@ -657,6 +657,9 @@ class DogShape {
         var _vertices = []; // Almacenará: [x, y, z, nx, ny, nz, u, v, ...]
         var _indices = [];
 
+        var vmin = [Infinity, Infinity, Infinity];
+        var vmax = [-Infinity, -Infinity, -Infinity];
+
         // Generar vértices con normales y UVs
         for (let j = 0; j <= descriptor.radialSegments; j++) {
             for (let i = 0; i <= descriptor.tubularSegments; i++) {
@@ -677,6 +680,9 @@ class DogShape {
                 // 3. UVs
                 const tu = i / descriptor.tubularSegments;
                 const tv = j / descriptor.radialSegments;
+
+                glMatrix.vec3.min(vmin, vmin, [x,y,z]);
+                glMatrix.vec3.max(vmax, vmax, [x,y,z]);
 
                 _vertices.push(x, y, z, nx, ny, nz, tu, tv);
             }
@@ -711,6 +717,10 @@ class DogShape {
         var mesh = new DogMesh();
         mesh.setNumVertices(_vertices.length / 8);
         mesh.setNumIndices(_indices.length);
+
+        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
+            mesh.setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
+        }
 
         var staticMesh = new DogStaticMesh();
         staticMesh.addMesh(mesh);

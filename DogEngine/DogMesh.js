@@ -1,4 +1,15 @@
+/**
+ * Mesh class represents a 3D model that can be rendered in the scene. It contains information about the transform,
+ * bounding volume, and other properties related to the mesh. The DogMesh class is responsible for updating its transform
+ * and rendering itself using the appropriate pipeline and resources.
+ * @author César Himura
+ * @version 1.0
+ */
 class DogMesh {
+    /**
+     * Create a new DogMesh instance. The constructor initializes the transform, number of 
+     * indices and vertices, parent ID, bounding volume, material ID, and local axes (forward, up, right).
+     */
     constructor() {
         this.transform = new DogTransform();
         this.numIndices = 0;
@@ -17,9 +28,22 @@ class DogMesh {
      * @param {float} deltaTime 
      */
     update(deltaTime){
-        
+        if(this.boundingVolume != null){
+            const position = this.transform.getPosition();
+            const rotation = this.transform.getRotation();
+            const scale = this.transform.getScale();
+
+            this.boundingVolume.getTransform().translateAbsolute(position[0], position[1], position[2]);
+            this.boundingVolume.getTransform().rotateAbsolute(rotation[0], rotation[1], rotation[2]);
+            this.boundingVolume.getTransform().scaleAbsolute(scale[0], scale[1], scale[2]);
+        }
     }
 
+    /**
+     * Draw the mesh using the provided GPU encoder pass. This method assumes that the necessary
+     * vertex and index buffers are already set up and that the appropriate pipeline is bound.
+     * @param {GPUEncoderPass} pass 
+     */
     render(pass){
         pGraphics.device.queue.writeBuffer(this.transform.getUniformBuffer(), 0, this.transform.getTransformMatrix());
 
