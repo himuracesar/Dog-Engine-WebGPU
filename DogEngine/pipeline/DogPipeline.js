@@ -8,14 +8,14 @@
  * @version 1.0
  */
 class DogPipeline {
-    constructor(name, shadersSource, vertexLayout, bindGroupLayouts = []) {
+    constructor(name, shadersSource, descriptor) {
         this.name = name;
-        this.vertexBufferLayout = this.createVertexBufferLayout(vertexLayout);
+        this.vertexBufferLayout = this.createVertexBufferLayout(descriptor.vertexLayout);
         this.shaderModule = this.createShaderModule(shadersSource);
-        this.topology = TopologyMode.TriangleList;
-        this.frontFace = FrontFaceMode.Ccw;
-        this.cullMode = CullMode.Back;
-        this.pipeline = this.createPipeline(bindGroupLayouts);
+        this.topology = descriptor.topology || TopologyMode.TriangleList;
+        this.frontFace = descriptor.frontFace || FrontFaceMode.Ccw;
+        this.cullMode = descriptor.cullMode || CullMode.Back;
+        this.pipeline = this.createPipeline(descriptor.bindGroupLayouts);
     }
 
     /**

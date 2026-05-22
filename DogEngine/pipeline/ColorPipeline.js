@@ -52,6 +52,11 @@ class ColorPipeline extends DogPipeline {
 
         let vertexLayout = { "position" : 3, "color" : 4 };
 
-        super("Color", shader, vertexLayout, bindGroupLayouts);
+        var descriptor = {
+            vertexLayout: vertexLayout,
+            bindGroupLayouts: bindGroupLayouts
+        };
+
+        super("Color", shader, descriptor);
     }
 }
