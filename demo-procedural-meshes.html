@@ -168,7 +168,7 @@
             descriptor.width = 50.0;
             descriptor.height = 50.0;
             descriptor.depth = 50.0;
-            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Box;
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
 
             cube = shape.createCube(descriptor);
 
@@ -176,7 +176,7 @@
             descriptor.radio = 25.0;
             descriptor.slices = 20;
             descriptor.stacks = 20;
-            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Sphere;
+            descriptor.boundingVolumeType = BoundingVolumeType.Sphere;
 
             sphere = shape.createSphere(descriptor);
 
@@ -195,7 +195,7 @@
             descriptor.bottomRadio = 20.0;
             descriptor.topRadio = 20.0;
             descriptor.height = 100.0;
-            //descriptor.boundingVolumeType = BoundingVolumeEnums.Type.Box;
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
 
             cylinder = shape.createCylinder(descriptor);
 
@@ -204,6 +204,7 @@
             descriptor.tuberadio = 10.0;
             descriptor.radialSegments = 32;
             descriptor.tubularSegments = 16;
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
 
             torus = shape.createTorus(descriptor);
 
@@ -421,10 +422,10 @@
                     clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
                     storeOp: "store",
                 }],
-                // AQUÍ ACTIVAS LA PROFUNDIDAD EN EL RENDER
+                
                 depthStencilAttachment: {
                     view: depthTexture.createView(),
-                    depthClearValue: 1.0, // 1.0 es el punto más lejano
+                    depthClearValue: 1.0, // 1.0 is the farthest point
                     depthLoadOp: 'clear',
                     depthStoreOp: 'store',
                 }

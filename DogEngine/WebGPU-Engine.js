@@ -24,6 +24,9 @@ include("/DogEngine/DogMesh.js");
 include("/DogEngine/DogResource.js");
 include("/DogEngine/DogBuffer.js");
 include("/DogEngine/DogResourceManager.js");
+include("/DogEngine/bounding/BoundingVolume.js");
+include("/DogEngine/bounding/BoundingSphere.js");
+include("/DogEngine/bounding/BoundingBox.js");
 include("/DogEngine/input/KeyCode.js");
 //-------------------------------------------------------
 
@@ -54,9 +57,21 @@ const FrontFaceMode = Object.freeze({
     Cw: "cw"
 });
 
+/**
+ * Buffer types for vertex and index buffers.
+ */
 const BufferType = Object.freeze({
     Vertex: "vertex",
     Index: "index"
+});
+
+/**
+ * Types of bounding volumes for collision detection.
+ */
+const BoundingVolumeType = Object.freeze({
+    None : 0,
+    Sphere : 1,
+    Box : 2
 });
 
 //------------------------------------------------------------
