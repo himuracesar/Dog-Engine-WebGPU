@@ -29,19 +29,6 @@ class DogMesh {
     }
 
     /**
-     * Update the transformation of the mesh. This method should be called after updating 
-     * the transform of the mesh to apply the changes to the model matrix.
-     * @param {Matrix4x4} spaceParent Matrix of the parent space to which the mesh belongs. This is used to calculate 
-     * the final model matrix of the mesh by multiplying it with the local transform matrix of the mesh.
-     */
-    updateTransformation(spaceParent){
-        const mModel = this.transform.getTransformMatrix();
-        glMatrix.mat4.multiply(mModel, spaceParent, mModel);
-
-        this.getTransform().setTransformMatrix(mModel);
-    }
-
-    /**
      * Get the transform of the mesh.
      * @returns {DogTransform} The transform of the mesh.
      */

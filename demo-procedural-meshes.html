@@ -149,6 +149,7 @@
         var grid;
         var cylinder;
         var torus;
+        var cube2;
 
         var depthTexture;
 
@@ -199,10 +200,17 @@
 
             torus = shape.createTorus(descriptor);
 
+            descriptor = {};
+            descriptor.width = 50.0;
+            descriptor.height = 50.0;
+            descriptor.depth = 50.0;
+            cube2 = shape.createCube(descriptor);
+            
             sphere.getTransform().translateAbsolute(100.0, 25.0, 0.0);
             cube.getTransform().translateAbsolute(0.0, 25.0, 0.0);
             cylinder.getTransform().translateAbsolute(-100.0, 50.0, 0.0);
             torus.getTransform().translateAbsolute(0.0, 25.0, -100.0);
+            cube2.getTransform().translateAbsolute(0.0, 120.0, 0.0);
         }
 
         function createPipeline(){
@@ -337,16 +345,17 @@
 
             input();
 
+            angle += dt * 0.075; 
+            angle = angle % 360;
+
+            cube2.getTransform().rotateAbsolute(glMatrix.glMatrix.toRadian(angle), glMatrix.glMatrix.toRadian(angle), 0.0);
+
             cube.update(dt);
             sphere.update(dt);
             grid.update(dt);
             cylinder.update(dt);
             torus.update(dt);
-
-            angle = 2.5 * dt * 0.01; 
-            angle = angle % 360;
-
-            //glMatrix.mat4.rotateY(modelMatrix, modelMatrix, glMatrix.glMatrix.toRadian(angle)); // Rotate 90 deg around Y
+            cube2.update(dt);
         }
 
         /**
@@ -382,7 +391,8 @@
             grid.render(pass);
             cylinder.render(pass);
             torus.render(pass);
-            
+            cube2.render(pass);
+
             pass.end();
 
             const commandBuffer = encoder.finish();

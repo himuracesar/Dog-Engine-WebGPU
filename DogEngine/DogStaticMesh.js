@@ -16,10 +16,16 @@ class DogStaticMesh {
         for(var i = 0; i < this.meshes.length; i++){
             this.meshes[i].update(deltaTime);
 
-            if(this.getTransform().hasChanged()) {
-                this.meshes[i].updateTransformation(this.transform.getTransformMatrix());
-            }
+            const deltaPosition = this.transform.getDeltaPosition();
+            const deltaRotation = this.transform.getDeltaRotation();
+            const deltaScale = this.transform.getDeltaScale();
+            
+            this.meshes[i].getTransform().translateRelative(deltaPosition[0], deltaPosition[1], deltaPosition[2]);
+            this.meshes[i].getTransform().rotateRelative(deltaRotation[0], deltaRotation[1], deltaRotation[2]);
+            this.meshes[i].getTransform().scaleRelative(deltaScale[0], deltaScale[1], deltaScale[2]);
         }
+
+        this.getTransform().balanceDeltas();
     }
 
     render(pass){
