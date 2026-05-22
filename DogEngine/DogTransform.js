@@ -25,6 +25,10 @@ class DogTransform {
         this.bindGroup = this.createBindGroup();
     }
 
+    /**
+     * Balances the deltas by setting the last position, scale and rotation to the current values. 
+     * This is used to optimize the calculation of the model matrix, so it is only recalculated when necessary.
+     */
     balanceDeltas() {
         this.lastPosition[0] = this.position[0];
         this.lastPosition[1] = this.position[1];

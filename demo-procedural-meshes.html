@@ -118,6 +118,7 @@
     <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/NormalColorPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
 </head>
 <body onload="init();">
     <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
@@ -139,6 +140,7 @@
         var angle = 0.0;
 
         var normalColorPipeline;
+        var wireframePipeline;
 
         var camera;
 
@@ -154,6 +156,9 @@
         var scalingFactor = 0.01;
 
         var depthTexture;
+
+        var propsBindGroup;
+        var propsBindGroupLayout;
 
         //------------------- Demo's main functions -------------------
         function createShapes(){
@@ -222,11 +227,47 @@
 
             normalColorPipeline = new NormalColorPipeline(bindGroupLayouts);
 
+            bindGroupLayouts.push(propsBindGroupLayout);
+            wireframePipeline = new WireframePipeline(bindGroupLayouts);
+
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
                 format: 'depth24plus',
                 usage: GPUTextureUsage.RENDER_ATTACHMENT,
             });
+        }
+
+        function createProps(){
+            propsBindGroupLayout = pGraphics.device.createBindGroupLayout({
+                entries: [{
+                    binding: 0,                           // Same index as in the bindGroup
+                    visibility: GPUShaderStage.FRAGMENT,    // In which stages is visible
+                    buffer: {
+                        type: "uniform"                     // uniform buffer (default)
+                    }
+                }]
+            });
+
+            var propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
+            var propsBuffer = pGraphics.device.createBuffer({
+                size: propsData.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+            pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
+            
+            propsBindGroup = pGraphics.device.createBindGroup({
+                layout: propsBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: propsBuffer,
+                        },
+                    },
+                ],
+            });
+
+            //return propsBindGroup;
         }
 
         //------------------ End demo's main functons -----------------
@@ -253,6 +294,7 @@
             resourceManager = new DogResourceManager();
 
             createShapes();
+            createProps();
             createPipeline();
 
             requestAnimationFrame(updateAndRender);
@@ -393,13 +435,17 @@
 
             pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
             pass.setBindGroup(0, camera.getBindGroup());
+            pass.setBindGroup(2, null);
 
             cube.render(pass);
             sphere.render(pass);
-            grid.render(pass);
             cylinder.render(pass);
             torus.render(pass);
             cube2.render(pass);
+
+            pass.setPipeline(wireframePipeline.getWebGPUPipeline());
+            pass.setBindGroup(2, propsBindGroup); // Bind group para Props
+            grid.render(pass);
 
             pass.end();
 
