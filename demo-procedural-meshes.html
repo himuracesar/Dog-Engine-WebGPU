@@ -151,6 +151,8 @@
         var torus;
         var cube2;
 
+        var scalingFactor = 0.01;
+
         var depthTexture;
 
         //------------------- Demo's main functions -------------------
@@ -349,6 +351,12 @@
             angle = angle % 360;
 
             cube2.getTransform().rotateAbsolute(glMatrix.glMatrix.toRadian(angle), glMatrix.glMatrix.toRadian(angle), 0.0);
+            var scale = cube2.getTransform().getScale()[0];
+            if(scale < 0.5 || cube2.getTransform().getScale()[0] > 3.0)
+                scalingFactor = -scalingFactor;
+
+            scale += scalingFactor;
+            cube2.getTransform().scaleAbsolute(scale, scale, scale);
 
             cube.update(dt);
             sphere.update(dt);
