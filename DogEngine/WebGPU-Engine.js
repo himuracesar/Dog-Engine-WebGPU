@@ -24,9 +24,9 @@ include("/DogEngine/DogMesh.js");
 include("/DogEngine/DogResource.js");
 include("/DogEngine/DogBuffer.js");
 include("/DogEngine/DogResourceManager.js");
-include("/DogEngine/bounding/BoundingVolume.js");
-include("/DogEngine/bounding/BoundingSphere.js");
-include("/DogEngine/bounding/BoundingBox.js");
+include("/DogEngine/bounding/DogBoundingVolume.js");
+include("/DogEngine/bounding/DogBoundingSphere.js");
+include("/DogEngine/bounding/DogBoundingBox.js");
 include("/DogEngine/input/KeyCode.js");
 //-------------------------------------------------------
 

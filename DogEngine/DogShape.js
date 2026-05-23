@@ -25,7 +25,7 @@ class DogShape {
      * @param {float} descriptor.width Width of the cube (x).
      * @param {float} descriptor.height Height of the cube (y).
      * @param {float} descriptor.depth Depth of the cube (z).
-     * @param {BoundingVolumeEnums.Type} descriptor.boundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
+     * @param {DogBoundingVolumeEnums.Type} descriptor.BoundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
      * @returns {DogStaticMesh} Cube with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
     createCube(descriptor){
@@ -107,8 +107,8 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
-            mesh.setBoundingVolume(new BoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
+        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
         }
 
         return staticMesh;
@@ -261,8 +261,8 @@ class DogShape {
         staticMesh.setIdIndexBuffer(indexBuffer.getId());
         //var mesh = webGLengine.createMesh(gl, vertices, indices, vertexFormat);
 
-        if(descriptor.boundingVolumeType === BoundingVolumeType.Sphere){
-            mesh.setBoundingVolume(new BoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
+        if(descriptor.BoundingVolumeType === BoundingVolumeType.Sphere){
+            mesh.setDogBoundingVolume(new DogBoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
         } 
 
         return staticMesh;
@@ -519,8 +519,8 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
-            mesh.setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
+        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
         return staticMesh;
@@ -718,8 +718,8 @@ class DogShape {
         mesh.setNumVertices(_vertices.length / 8);
         mesh.setNumIndices(_indices.length);
 
-        if(descriptor.boundingVolumeType === BoundingVolumeType.Box){
-            mesh.setBoundingVolume(new BoundingBox({ vmin: vmin, vmax: vmax }));
+        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
         var staticMesh = new DogStaticMesh();

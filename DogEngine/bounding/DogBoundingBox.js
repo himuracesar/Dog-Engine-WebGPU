@@ -1,13 +1,13 @@
 
 /**
- * BoundingBox class represents an axis-aligned bounding box (AABB) in 3D space.
- * It extends the BoundingVolume class and provides methods to compute the AABB based on minimum and maximum vertices.
+ * DogBoundingBox class represents an axis-aligned bounding box (AABB) in 3D space.
+ * It extends the DogBoundingVolume class and provides methods to compute the AABB based on minimum and maximum vertices.
  * The bounding box is defined by its width, height, and depth, which are calculated from the minimum and maximum vertices.
  * It also includes a method to convert Euler angles to local axes vectors for orientation purposes.
  * @author César Himura
  * @version 1.0
  */
-class BoundingBox extends BoundingVolume{
+class DogBoundingBox extends DogBoundingVolume{
     /**
      * Create a box bounding according the configuration
      * @param {Object} config - The configuration object for the bounding box

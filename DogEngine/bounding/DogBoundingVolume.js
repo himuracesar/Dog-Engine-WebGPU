@@ -3,7 +3,7 @@
  * @author César Himura
  * @version 1.0
  */
-class BoundingVolume {
+class DogBoundingVolume {
 
     /**
      * Creates a new bounding volume

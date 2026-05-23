@@ -227,6 +227,8 @@ class DogCamera {
         this.pitchAngle += units;
     }
 
+    //----------------------- WebGPU's methods -----------------------
+
     /**
      * Create the uniform buffer for the camera.
      * @returns {GPUBuffer} Uniform buffer for the camera.

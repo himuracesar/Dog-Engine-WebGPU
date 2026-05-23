@@ -4,7 +4,7 @@
  * @author César Himura
  * @version 1.0
  */
-class BoundingSphere extends BoundingVolume {
+class DogBoundingSphere extends DogBoundingVolume {
     /**
      * Create a sphere bounding according the configuration
      * @param {Object} config - The configuration object for the bounding sphere
@@ -21,7 +21,7 @@ class BoundingSphere extends BoundingVolume {
         this.type = BoundingVolumeType.Sphere;
 
         if(this.radio == 0.0)
-            this.computeBoundingSphere();
+            this.computeDogBoundingSphere();
 
         //Only for debug
         this.mesh = null;
@@ -30,7 +30,7 @@ class BoundingSphere extends BoundingVolume {
     /**
      * Compute the sphere bounding from minimum and maximum vectors
      */
-    computeBoundingSphere(){
+    computeDogBoundingSphere(){
         var vmin = super.getVectorMin();
         var vmax = super.getVectorMax();
         
