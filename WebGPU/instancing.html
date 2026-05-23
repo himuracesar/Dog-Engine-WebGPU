@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog WebGPU - Instancing</title>
+
+    <style>
+        :root {
+            --tp-base-background-color: hsla(0, 0%, 10%, 0.8);
+            --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+            --tp-button-background-color: hsla(0, 0%, 80%, 1);
+            --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+            --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+            --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+            --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+            --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+            --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.3);
+        }
+
+        /*body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }*/
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            transform: translateZ(0); /* Force GPU Layer */
+        }
+        
+        /* Containers for the Widgets */
+        .widget-pane {
+            /*position: fixed;*/
+            position: absolute;
+            z-index: 10;
+            width: 260px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            /* Avoid that events affect the canvas if not necessary */
+            pointer-events: auto; 
+
+            transform: translateZ(0); /* Crea un nuevo stacking context en GPU */
+            backface-visibility: hidden;
+            perspective: 1000;
+            will-change: transform, opacity;
+        }
+
+        #ui-camera { top: 10px; right: 300px; }
+        #ui-geometry { top: 10px; right: 20px; }
+        #ui-performance { bottom: 20px; left: 10px; width: 200px; }
+        #ui-config { top: 10px; left: 10px; }
+        
+        .label { position: fixed; bottom: 10px; right: 20px; color: #555; font-size: 12px; }
+    </style>
+
+    <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
+    <link rel="icon" href="/DogEngine/ico/Triangle_icon.png" type="image/png">
+
+    <script>
+        // Global state for the performance monitor
+        var performanceState = {
+            fps: 0.0
+        };
+        // Global state for the configuration parameters
+        var configState = {
+            background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+        };
+    </script>
+
+    <script type="module">
+        import { Pane } from '/DogEngine/lib/tweakpane-4.0.5.js';
+        //import { mat4 } from 'gl-matrix';
+
+        // --- Widget 1: Performance  ---
+        const panePerformance = new Pane({ container: document.getElementById('ui-performance'), title: '📊 Performance' });
+        panePerformance.addBinding(performanceState, 'fps', { label: 'FPS', readonly: true, view: 'number' }).on('change', emitUI);
+        panePerformance.addBinding(performanceState, 'fps', { 
+            label: 'FPS Graph', readonly: true, view: 'graph', 
+            interval: 100, bufferSize: 64, min: 10, max: 200 
+        }).on('change', emitUI);
+
+        // --- Widget 2: Config  ---
+        const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
+        paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
+
+
+        // Send data to the engine
+        function emitUI() {
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+        }
+
+        // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
+        setInterval(() => {
+            panePerformance.refresh();
+        }, 100);
+
+        // Emit initial state
+        emitUI();
+    </script>
+
+    <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
+    <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
+    
+    <script type="text/javascript" src="/WebGPU/pipeline/ColorInstancingPipeline.js"></script>
+</head>
+<body onload="init();">
+    <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
+
+    <!-- Containers for Tweakpane -->
+    <div id="ui-performance" class="widget-pane"></div>
+    <div id="ui-config" class="widget-pane"></div>
+
+    <script type="text/javascript">
+        var canvas;
+        var pGraphics;
+
+        let lastTime = 0;
+
+        /******* Events' names for clean communication *******/
+        const EVT_DATA = 'engine-data-update';
+        const EVT_UI = 'ui-params-change';
+        
+        var angle = 0.0;
+
+        var vertexBuffer;
+        var indexBuffer;
+
+        var colorInstancingPipeline;
+
+        var camera;
+
+        var modelMatrix;
+        var modelBuffer;
+        var modelBindGroup;
+
+        var depthTexture;
+
+        const matrices = [];
+        const numInstances = 3;
+        var transformData = new Float32Array(16 * numInstances);
+
+        //------------------- Demo's main functions -------------------
+        function createShapes(){
+            // position (3), color (4)
+            const vertices = new Float32Array([
+                //Front
+                -1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //0
+                 1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //1
+                 1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //2
+                -1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //3
+                //Right
+                1.0, -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //4
+                1.0, -1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //5
+                1.0,  1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //6
+                1.0,  1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //7
+                //Back
+                 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //8
+                -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //9
+                -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //10
+                 1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //11
+                //Left
+                -1.0, -1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //12
+                -1.0, -1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //13
+                -1.0,  1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //14
+                -1.0,  1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //15
+                //Top
+                -1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //16
+                 1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //17
+                 1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //18
+                -1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //19
+                //Bottom
+                -1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //20
+                 1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //21
+                 1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0, //22
+                -1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0  //23
+            ]);
+
+            const indices = new Uint16Array([
+                //Back
+                0, 1, 2, 0, 2, 3,
+                //Right
+                4, 5, 6, 4, 6, 7,
+                //Front
+                8, 9, 10, 8, 10, 11,
+                //Left
+                12, 13, 14, 12, 14, 15,
+                //Top
+                //16, 17, 18, 16, 18, 19,
+                16, 17, 18, 16, 18, 19,
+                //Bottom
+                20, 21, 22, 20, 22, 23
+            ]);
+
+            vertexBuffer = pGraphics.device.createBuffer({
+                label: "vertex positions",
+                size: vertices.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+                mappedAtCreation: true, // Ask access immediately to the memory
+            });
+
+            indexBuffer = pGraphics.device.createBuffer({
+                label: "index buffer",
+                size: indices.byteLength,
+                usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+                mappedAtCreation: true, // Ask access immediately to the memory
+            });
+
+            new Float32Array(vertexBuffer.getMappedRange()).set(vertices);
+            // Close the access. Now the data lives 100% on the GPU
+            vertexBuffer.unmap();
+
+            new Uint16Array(indexBuffer.getMappedRange()).set(indices);
+            // Close the access. Now the data lives 100% on the GPU
+            indexBuffer.unmap();
+        }
+
+        function createPipeline(){
+            colorInstancingPipeline = new ColorInstancingPipeline();
+
+            depthTexture = pGraphics.device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+        }
+
+        function createBindings(){
+            const modelBufferSize = 16 * 4 * numInstances; // Matrix4x4 has 16 floats, each float is 4 bytes
+            modelBuffer = pGraphics.device.createBuffer({
+                size: modelBufferSize,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+
+            bindGroup = pGraphics.device.createBindGroup({
+                layout: colorInstancingPipeline.getWebGPUPipeline().getBindGroupLayout(0),
+                entries: [{
+                    binding: 0,
+                    resource: { buffer: camera.getUniformBuffer() }
+                }],
+            });
+
+            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
+                entries: [{
+                    binding: 0,                           
+                    visibility: GPUShaderStage.VERTEX, 
+                    buffer: {
+                        type: "uniform"
+                    }
+                }]
+            });
+
+            modelBindGroup = pGraphics.device.createBindGroup({
+                layout: colorInstancingPipeline.getWebGPUPipeline().getBindGroupLayout(1),
+                entries: [{
+                    binding: 0,
+                    resource: { buffer: modelBuffer }
+                }],
+            });
+        }
+
+        /**
+         * Creates all the matrices for each instance.
+         */
+        function createMatrices() {
+            for (let i = 0; i < numInstances; ++i) {
+                const byteOffsetToMatrix = i * 16 * 4;
+                const numFloatsForView = 16;
+                matrices.push(new Float32Array(
+                    transformData.buffer,
+                    byteOffsetToMatrix,
+                    numFloatsForView));
+            }
+        }
+        
+        /**
+         * Updates all the matrices for each instance.
+         */
+        function updateMatrices(){
+            // update all the matrices
+            const position = [-5.0, 0.0, 5.0];
+            matrices.forEach((mat, ndx) => {
+                let matrix = glMatrix.mat4.create();
+
+                glMatrix.mat4.translate(matrix, matrix, [position[ndx], 0, 0]);
+
+                if(ndx == 0)
+                    glMatrix.mat4.rotateY(matrix, matrix, angle);
+                else if(ndx == 1)
+                    glMatrix.mat4.rotateX(matrix, matrix, angle);
+                else if(ndx == 2) 
+                    glMatrix.mat4.rotateZ(matrix, matrix, angle);
+    
+                mat.set(matrix);
+            });
+
+            pGraphics.device.queue.writeBuffer(
+                modelBuffer,
+                0,
+                transformData.buffer,
+                transformData.byteOffset,
+                transformData.byteLength
+            );
+        }
+
+        //------------------ End demo's main functons -----------------
+
+        /**
+         * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
+         */
+        async function init(){
+            canvas = document.getElementById("WebGPUcanvas");
+
+            pGraphics = await webGPUengine.initWebGPU(canvas);
+
+            window.onkeydown = event => this.onKeyDown(event);
+            window.onkeyup = event => this.onKeyUp(event);
+            canvas.onmouseup = event => this.onMouseUp(event);
+            canvas.onmousedown = event => this.onMouseDown(event);
+            canvas.onmousemove = event => this.onMouseMove(event);
+
+            camera = new DogCamera();
+            camera.setPosition([0.0, 0.0, 5.0]);
+            camera.setSpeed(0.2);
+            camera.setFarPlane(4000.0);
+
+            createShapes();
+            createPipeline();
+            createBindings();
+            createMatrices();
+            updateMatrices();
+
+            requestAnimationFrame(updateAndRender);
+        }
+
+        //------------- Input -------------
+        /**
+         * Release click and stop dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseUp(event) {
+            this.dragging = false;
+            mouse.down = false;
+        }
+
+        /**
+         * Click and start dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseDown(event) {
+            this.dragging = true;
+            var x = event.clientX; // x coordinate of a mouse pointer
+            var y = event.clientY; // y coordinate of a mouse pointer
+            var rect = event.target.getBoundingClientRect();
+
+            //console.log("Mouse down at: " + x + ", " + y);
+            mouse.down = true;
+            mouse.x = x;
+            mouse.y = y;
+
+            //x = ((x - rect.left) - canvas.width / 2) / (canvas.width / 2);
+            //y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2);
+            console.log("Mouse down at: " + x + ", " + y);
+        }
+
+        /**
+         * If dragging, calculates the difference in mouse position and rotates the camera.
+         * @param {MouseEvent} event 
+         */
+        function onMouseMove(event) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+
+            this.x = event.clientX;
+            this.y = event.clientY;
+
+            mouse.x = this.x;
+            mouse.y = this.y;
+
+            if (!this.dragging) 
+                return;
+
+            const dx = this.x - this.lastX;
+            const dy = this.y - this.lastY;
+
+            camera.yaw(dx * camera.getSpeedRotation());
+            camera.pitch(dy * camera.getSpeedRotation());
+        }
+
+        /**
+         * Handles input events.
+         */
+        function input(){
+            if(keypress[KeyCode.W])
+                camera.moveForward(1);
+            if(keypress[KeyCode.S])
+                camera.moveForward(-1);
+            if(keypress[KeyCode.A])
+                camera.strafe(-1);
+            if(keypress[KeyCode.D])
+                camera.strafe(1);
+            if(keypress[KeyCode.Left])
+                camera.yaw(0.01);
+            if(keypress[KeyCode.Right])
+                camera.yaw(-0.01);
+            if(keypress[KeyCode.Up])
+                camera.pitch(0.01);
+            if(keypress[KeyCode.Down])
+                camera.pitch(-0.01);
+        }
+
+        //------------- End Input -------------
+        /**
+         * Updates the performance state and handles input.
+         * @param {float} time - The current time in milliseconds.
+         */
+        function update(time){
+            const dt = (time - lastTime);
+            lastTime = time;
+            
+            performanceState.fps = 1000 / dt;
+
+            input();
+
+            angle += 0.001 * dt; 
+            angle = angle % 360;
+
+            updateMatrices();
+        }
+
+        /**
+         * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
+         */
+        function render(){
+            // Rendering logic goes here (e.g., issuing draw calls)
+            const encoder = pGraphics.device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                    view: pGraphics.context.getCurrentTexture().createView(),
+                    loadOp: "clear",
+                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
+                    storeOp: "store",
+                }],
+                
+                depthStencilAttachment: {
+                    view: depthTexture.createView(),
+                    depthClearValue: 1.0, // 1.0 es el punto más lejano
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                }
+            });
+
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            pass.setPipeline(colorInstancingPipeline.getWebGPUPipeline());
+            pass.setBindGroup(0, bindGroup);
+            pass.setBindGroup(1, modelBindGroup);
+            pass.setVertexBuffer(0, vertexBuffer);
+            pass.setIndexBuffer(indexBuffer, 'uint16');
+            //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
+            pass.drawIndexed(36, numInstances, 0, 0, 0);
+            pass.end();
+
+            const commandBuffer = encoder.finish();
+
+            // Finish the command buffer and immediately submit it.
+            pGraphics.device.queue.submit([commandBuffer]);
+            //console.log("Frame rendered");
+        }
+
+        /**
+         * Combines the update and render functions into a single loop that runs on each animation frame.
+         * @param {float} currentTime - The current time in milliseconds.
+         */
+        function updateAndRender(currentTime){
+            update(currentTime);
+            render();
+
+            requestAnimationFrame(updateAndRender);
+        }
+    </script>
+</body>
+</html>
