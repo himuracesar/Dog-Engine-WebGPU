@@ -19,10 +19,24 @@ class DogTransform {
         this.lastRotation = [0.0, 0.0, 0.0, 1.0];
 
         this.balanceDeltas();
+        
+        try {
+            const jsonTransform = bindGroupLayouts.get("DogTransform");
 
-        this.uniformBuffer = this.createUniformBuffer();
-        this.bindGroupLayout = this.createBindGroupLayout();
-        this.bindGroup = this.createBindGroup();
+            this.idBuffer = webGPUengine.createDogBuffer("Transform" + new Date().getTime(), BufferType.Data, null, jsonTransform.bufferSize, true);
+            this.bindGroup = webGPUengine.createBindGroup("Transform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));
+            this.group = jsonTransform.group;
+            this.binding = jsonTransform.binding;
+        } catch(error) {
+            console.log("The bind group layouts are automatically created");
+
+            this.bindGroupLayout = null;
+            this.bufferSize = 16 * 4 * 2;
+            this.idBuffer = webGPUengine.createDogBuffer("Transform"  + new Date().getTime(), BufferType.Data, null, this.bufferSize, true);
+            this.bindGroup = null; 
+            this.group = -1;
+            this.binding = -1;
+        }
     }
 
     /**
@@ -249,7 +263,7 @@ class DogTransform {
      * Creates a uniform buffer for the model matrix. This buffer can be used to send the model matrix to the GPU.
      * @returns {GPUBuffer} A GPU buffer that can be used as a uniform buffer for the model matrix.
      */
-    createUniformBuffer(){
+    /*createUniformBuffer(){
         const bufferSize = 16 * 4; // Matrix4x4 has 16 floats, each float is 4 bytes
         const buffer = pGraphics.device.createBuffer({
             size: bufferSize,
@@ -257,13 +271,13 @@ class DogTransform {
         });
         
         return buffer;
-    }
+    }*/
 
     /**
      * Creates a bind group layout for the model matrix. This layout can be used to create a bind group that includes the model matrix uniform buffer.
      * @returns {GPUBindGroupLayout} A bind group layout for the model matrix uniform buffer.
      */
-    createBindGroupLayout(){
+    /*createBindGroupLayout(){
         const bindGroupLayout = pGraphics.device.createBindGroupLayout({
             entries: [{
                 binding: 0,                           // Same index as in the bindGroup
@@ -275,14 +289,14 @@ class DogTransform {
         });
 
         return bindGroupLayout;
-    }
+    }*/
 
     /**
      * Creates a bind group for the model matrix. This bind group can be used to bind the model matrix 
      * uniform buffer to the shader.
      * @returns {GPUBindGroup} A bind group that binds the model matrix uniform buffer to the shader.
      */
-    createBindGroup(){
+    /*createBindGroup(){
         const bindGroup = pGraphics.device.createBindGroup({
             layout: this.bindGroupLayout,
             entries: [{
@@ -292,14 +306,14 @@ class DogTransform {
         });
 
         return bindGroup;
-    }
+    }*/
 
     /**
      * Gets the uniform buffer for the model matrix. This buffer can be used to send the model matrix to the GPU.
      * @returns {GPUBuffer} The uniform buffer for the model matrix.
      */
-    getUniformBuffer(){
-        return this.uniformBuffer;
+    getBuffer(){
+        return resourceManager.get(this.idBuffer);
     }
 
     /**
@@ -312,11 +326,19 @@ class DogTransform {
     }
 
     /**
+     * Gets the group to belong this component in the shaders.
+     * @returns {int} group Group
+     */
+    getGroup(){
+        return this.group;
+    }
+
+    /**
      * Gets the bind group layout for the model matrix. This bind group layout can be used to create 
      * a bind group that includes the model matrix uniform buffer.
      * @returns {GPUBindGroupLayout} The bind group layout for the model matrix uniform buffer.
      */
-    getBindGroupLayout(){
+    /*getBindGroupLayout(){
         return this.bindGroupLayout;
-    }
+    }*/
 }

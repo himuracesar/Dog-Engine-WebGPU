@@ -45,9 +45,9 @@ class DogMesh {
      * @param {GPUEncoderPass} pass 
      */
     render(pass){
-        pGraphics.device.queue.writeBuffer(this.transform.getUniformBuffer(), 0, this.transform.getTransformMatrix());
+        pGraphics.device.queue.writeBuffer(this.transform.getBuffer().getWebGPUBuffer(), 0, this.transform.getTransformMatrix());
 
-        pass.setBindGroup(1, this.transform.getBindGroup());
+        pass.setBindGroup(this.transform.getGroup(), this.transform.getBindGroup());
          //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
         pass.drawIndexed(this.numIndices, 1, 0, 0, 0);
     }

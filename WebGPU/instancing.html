@@ -251,7 +251,7 @@
                 layout: colorInstancingPipeline.getWebGPUPipeline().getBindGroupLayout(0),
                 entries: [{
                     binding: 0,
-                    resource: { buffer: camera.getUniformBuffer() }
+                    resource: { buffer: camera.getBuffer().getWebGPUBuffer() }
                 }],
             });
 
@@ -465,8 +465,8 @@
                 }
             });
 
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
 
             pass.setPipeline(colorInstancingPipeline.getWebGPUPipeline());
             pass.setBindGroup(0, bindGroup);

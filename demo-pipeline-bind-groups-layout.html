@@ -144,6 +144,8 @@
 
         var camera;
 
+         var bindGroupLayouts;
+
         var modelMatrix;
         var modelBuffer;
         var modelBindGroupLayout;
@@ -228,7 +230,7 @@
 
         function createPipeline(){
             var bgl = [];
-            bgl.push(camera.getBindGroupLayout());
+            bgl.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
             bgl.push(modelBindGroupLayout);
 
             colorPipeline = new ColorPipeline(bgl);
@@ -283,6 +285,8 @@
             canvas.onmouseup = event => this.onMouseUp(event);
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
+
+            bindGroupLayouts = webGPUengine.createBindGroupLayouts();
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);
@@ -413,8 +417,8 @@
                 }
             });
 
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
             pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
             pass.setPipeline(colorPipeline.getWebGPUPipeline());

@@ -28,9 +28,28 @@ class DogCamera {
         this.speedRotation = 0.005;
         this.velocity = [0.0, 0.0, 0.0];
 
-        this.uniformBuffer = this.createUniformBuffer();
-        this.bindGroupLayout = this.createBindGroupLayout();
-        this.bindGroup = this.createBindGroup();
+        try{
+            const jsonCamera = bindGroupLayouts.get("DogCamera");
+
+            this.bindGroupLayout = jsonCamera.bindGroupLayout;
+            this.bufferSize = jsonCamera.bufferSize || 16 * 4 * 2;
+            this.buffer = new DogBuffer("Camera", BufferType.Data, null, this.bufferSize);
+            this.bindGroup = webGPUengine.createBindGroup("Camera", jsonCamera.binding, this.bindGroupLayout, this.buffer);
+            this.group = jsonCamera.group;
+            this.binding = jsonCamera.binding;
+        } catch(error) {
+            console.log("The bind group layouts are automatically created");
+
+            this.bindGroupLayout = null;
+            this.bufferSize = 16 * 4 * 2;
+            this.buffer = new DogBuffer("Camera", BufferType.Data, null, this.bufferSize);
+            this.bindGroup = null; 
+            this.group = -1;
+            this.binding = -1;
+        }
+        
+
+        
     }
 
     /**
@@ -233,7 +252,7 @@ class DogCamera {
      * Create the uniform buffer for the camera.
      * @returns {GPUBuffer} Uniform buffer for the camera.
      */
-    createUniformBuffer(){
+    /*createUniformBuffer(){
         const cameraBufferSize = 16 * 4 * 2; // Matrix4x4 has 16 floats, each float is 4 bytes, and we have 2 matrices (view and projection)
         const cameraBuffer = pGraphics.device.createBuffer({
             size: cameraBufferSize,
@@ -241,14 +260,14 @@ class DogCamera {
         });
         
         return cameraBuffer;
-    }
+    }*/
 
     /**
      * Create the bind group layout for the camera. The bind group layout defines the layout of the bind group, 
      * which is used to bind the uniform buffer to the shader.
      * @returns {GPUBindGroupLayout} Bind group layout for the camera.
      */
-    createBindGroupLayout(){
+    /*createBindGroupLayout(){
         const bindGroupLayout = pGraphics.device.createBindGroupLayout({
             entries: [{
                 binding: 0,                           // Same index as in the bindGroup
@@ -260,14 +279,14 @@ class DogCamera {
         });
 
         return bindGroupLayout;
-    }
+    }*/
 
     /**
      * Create the bind group for the camera. First create the bind group layout and then create 
      * the bind group with the uniform buffer of the camera.
      * @returns {GPUBindGroup} Bind group for the camera.
      */
-    createBindGroup(){
+    /*createBindGroup(){
         const bindGroup = pGraphics.device.createBindGroup({
             layout: this.bindGroupLayout,
             entries: [{
@@ -277,7 +296,7 @@ class DogCamera {
         });
 
         return bindGroup;
-    }
+    }*/
 
     /**
      * Get the bind group for the camera.
@@ -291,8 +310,8 @@ class DogCamera {
      * Get the uniform buffer of the camera.
      * @returns {GPUBuffer} Uniform buffer of the camera.
      */
-    getUniformBuffer(){
-        return this.uniformBuffer;
+    getBuffer(){
+        return this.buffer;
     }
 
     /**
@@ -301,5 +320,21 @@ class DogCamera {
      */
     getBindGroupLayout(){
         return this.bindGroupLayout;
+    }
+
+    /**
+     * Gets the group belong the camera in the shaders.
+     * @returns {int} group Group of the camera.
+     */
+    getGroup(){
+        return this.group;
+    }
+
+    /**
+     * Gets the binding belong the camera in the shaders.
+     * @returns {int} binding Binding of the camera.
+     */
+    getBinding(){
+        return this.binding;
     }
 }

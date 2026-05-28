@@ -155,6 +155,8 @@
 
         var scalingFactor = 0.01;
 
+        var bindGroupLayouts;
+
         var depthTexture;
 
         var propsBindGroup;
@@ -222,14 +224,14 @@
         }
 
         function createPipeline(){
-            var bindGroupLayouts = [];
-            bindGroupLayouts.push(camera.getBindGroupLayout());
-            bindGroupLayouts.push(cube.getTransform().getBindGroupLayout());
+            var bgl = [];
+            bgl.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
+            bgl.push(bindGroupLayouts.get("DogTransform").bindGroupLayout);
 
-            normalColorPipeline = new NormalColorPipeline(bindGroupLayouts);
+            normalColorPipeline = new NormalColorPipeline(bgl);
 
-            bindGroupLayouts.push(propsBindGroupLayout);
-            wireframePipeline = new WireframePipeline(bindGroupLayouts);
+            bgl.push(propsBindGroupLayout);
+            wireframePipeline = new WireframePipeline(bgl);
 
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
@@ -287,13 +289,15 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            camera = new DogCamera();
-            camera.setPosition([0.0, 0.0, 100.0]);
-            camera.setSpeed(1.3);
-            camera.setFarPlane(4000.0);
+            bindGroupLayouts = webGPUengine.createBindGroupLayouts();
 
             resourceManager = new DogResourceManager();
 
+            camera = new DogCamera();
+            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setSpeed(2.3);
+            camera.setFarPlane(4000.0);
+            
             createShapes();
             createProps();
             createPipeline();
@@ -431,11 +435,14 @@
                 }
             });
 
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            /*pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 16 * 4, camera.getProjectionMatrix());*/
 
             pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
-            pass.setBindGroup(0, camera.getBindGroup());
+            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
             pass.setBindGroup(2, null);
 
             cube.render(pass);
