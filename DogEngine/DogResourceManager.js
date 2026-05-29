@@ -10,6 +10,7 @@ class DogResourceManager {
      */
     constructor() {
         this.resources = {};
+        this.counter = 0;
     }
 
     /**
@@ -30,5 +31,13 @@ class DogResourceManager {
      */
     get(name) {
         return this.resources[name];
+    }
+
+    /**
+     * Gets the count to concatenate to the resource's ID and increment in one the counter.
+     * @returns {int} The current count.
+     */
+    getCounterID() {
+        return this.counter++;
     }
 }

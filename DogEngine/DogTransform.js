@@ -19,12 +19,14 @@ class DogTransform {
         this.lastRotation = [0.0, 0.0, 0.0, 1.0];
 
         this.balanceDeltas();
+
+        const idCount = resourceManager.getCounterID();
         
         try {
             const jsonTransform = bindGroupLayouts.get("DogTransform");
 
-            this.idBuffer = webGPUengine.createDogBuffer("Transform" + new Date().getTime(), BufferType.Data, null, jsonTransform.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("Transform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));
+            this.idBuffer = webGPUengine.createDogBuffer("DogTransform" + idCount, BufferType.Data, null, jsonTransform.bufferSize, true);
+            this.bindGroup = webGPUengine.createBindGroup("DogTransform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));
             this.group = jsonTransform.group;
             this.binding = jsonTransform.binding;
         } catch(error) {
@@ -32,7 +34,7 @@ class DogTransform {
 
             this.bindGroupLayout = null;
             this.bufferSize = 16 * 4 * 2;
-            this.idBuffer = webGPUengine.createDogBuffer("Transform"  + new Date().getTime(), BufferType.Data, null, this.bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogTransform"  + idCount, BufferType.Data, null, this.bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;

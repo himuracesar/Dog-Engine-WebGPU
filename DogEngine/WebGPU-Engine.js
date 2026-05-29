@@ -174,7 +174,7 @@ const GPUVisibility = Object.freeze({
          * @param {int} binding Number of the binding in the shader.
          * @param {GPUBindGroupLayout} bindGroupLayout Bind group layout in WebGPU.
          * @param {DogBuffer} buffer Buffer to link the bind group.
-         * @returns 
+         * @returns {Array} Group Bind Layouts
          */
         function createBindGroup(name, binding, bindGroupLayout, buffer) {
             const bindGroup = pGraphics.device.createBindGroup({
@@ -200,6 +200,17 @@ const GPUVisibility = Object.freeze({
          * otherwise.
          */
         function createDogBuffer(name, type, data, size = 0, store = false) {
+            try {
+                const b = resourceManager.get(name);
+                if(b != null) {
+                    b.addReference();
+                    
+                    return name;
+                }
+            } catch(error) {
+                console.log("createDogBuffer:: The resource manager is not initialized." + error);
+            }
+
             const buffer = new DogBuffer(name, type, data, size);
             buffer.addReference();
 

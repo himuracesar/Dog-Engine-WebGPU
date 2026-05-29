@@ -33,9 +33,9 @@ class DogMesh {
             const rotation = this.transform.getRotation();
             const scale = this.transform.getScale();
 
-            this.boundingVolume.getTransform().translateAbsolute(position[0], position[1], position[2]);
+            /*this.boundingVolume.getTransform().translateAbsolute(position[0], position[1], position[2]);
             this.boundingVolume.getTransform().rotateAbsolute(rotation[0], rotation[1], rotation[2]);
-            this.boundingVolume.getTransform().scaleAbsolute(scale[0], scale[1], scale[2]);
+            this.boundingVolume.getTransform().scaleAbsolute(scale[0], scale[1], scale[2]);*/
         }
     }
 

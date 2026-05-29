@@ -47,9 +47,6 @@ class DogCamera {
             this.group = -1;
             this.binding = -1;
         }
-        
-
-        
     }
 
     /**

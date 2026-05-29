@@ -1,22 +1,23 @@
 
 /**
- * DogBoundingBox class represents an axis-aligned bounding box (AABB) in 3D space.
+ * DogBoundingBox class represents an axis-aligned bounding box (AABB) and oriented-aligned bounding box (OBB) in 3D space.
  * It extends the DogBoundingVolume class and provides methods to compute the AABB based on minimum and maximum vertices.
  * The bounding box is defined by its width, height, and depth, which are calculated from the minimum and maximum vertices.
  * It also includes a method to convert Euler angles to local axes vectors for orientation purposes.
  * @author César Himura
  * @version 1.0
  */
-class DogBoundingBox extends DogBoundingVolume{
+class DogBoundingBox extends DogBoundingVolume {
     /**
      * Create a box bounding according the configuration
      * @param {Object} config - The configuration object for the bounding box
      * @param {Vector3} config.vmin - The minimum vertex of the bounding box (default: [0.0, 0.0, 0.0])
      * @param {Vector3} config.vmax - The maximum vertex of the bounding box (default: [0.0, 0.0, 0.0])
+     * @param {Vector3} config.position - The position of the bounding box (default: [0.0, 0.0, 0.0])
      */
     constructor(config = {}){
         super(config.vmin || [0.0, 0.0, 0.0], config.vmax || [0.0, 0.0, 0.0]);
-        //super.setPosition(config.position || [0.0, 0.0, 0.0]); 
+        super.setPosition(config.position || [0.0, 0.0, 0.0]); 
 
         this.width = 0.0;
         this.height = 0.0;
@@ -32,15 +33,15 @@ class DogBoundingBox extends DogBoundingVolume{
      * Compute the axis-aligned bounding box (AABB) based on the minimum and maximum vertices.
      */
     computeAABB(){
-        /*this.position = [
+        this.position = [
             (this.vmin[0] + this.vmax[0]) / 2.0,
             (this.vmin[1] + this.vmax[1]) / 2.0,
             (this.vmin[2] + this.vmax[2]) / 2.0
-        ];*/
+        ];
 
-        this.width = Math.abs(this.vmax[0]) * 2.0;
-        this.height = Math.abs(this.vmax[1]) * 2.0;
-        this.depth = Math.abs(this.vmax[2]) * 2.0;
+        this.width = Math.abs(this.vmax[0] - this.position[0]) * 2.0;
+        this.height = Math.abs(this.vmax[1] - this.position[1]) * 2.0;
+        this.depth = Math.abs(this.vmax[2] - this.position[2]) * 2.0;
     }
 
     /**
@@ -73,10 +74,9 @@ class DogBoundingBox extends DogBoundingVolume{
                     z: cy * cx
                 }
             };
-
-            this.orientation.u = m4.normalize([this.orientation.u.x, this.orientation.u.y, this.orientation.u.z]);
-            this.orientation.v = m4.normalize([this.orientation.v.x, this.orientation.v.y, this.orientation.v.z]);
-            this.orientation.w = m4.normalize([this.orientation.w.x, this.orientation.w.y, this.orientation.w.z]);
+            glMatrix.vec3.normalize(this.orientation.u, [this.orientation.u.x, this.orientation.u.y, this.orientation.u.z]);
+            glMatrix.vec3.normalize(this.orientation.v, [this.orientation.v.x, this.orientation.v.y, this.orientation.v.z]);
+            glMatrix.vec3.normalize(this.orientation.w, [this.orientation.w.x, this.orientation.w.y, this.orientation.w.z]);
         }
 
         return this.orientation;
