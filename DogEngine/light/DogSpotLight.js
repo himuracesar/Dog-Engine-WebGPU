@@ -3,9 +3,11 @@
  * @author Cesar Himura
  * @version 1.0
  */
-class SpotLight{
-    constructor(){
-        this.buffer = null;
+class DogSpotLight {
+    /**
+     * Create an instance of spot light.
+     */
+    constructor() {
         this.position = [0.0, 0.0, 0.0];
         this.direction = [0.0, -1.0, 0.0, 0.0];
         this.color = [1.0, 1.0, 1.0, 1.0];
@@ -21,9 +23,24 @@ class SpotLight{
 		this.angleZ = 0.0;
         this.intensity = 1.0;
         this.enabled = true;
-        this.indexBuffer = -1;
-        this.bindingPoint = -1;
-        this.hasChange = false;
+
+        try {
+            const jsonObject = bindGroupLayouts.get("DogSpotLight");
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+            this.bindGroup = webGPUengine.createBindGroup("DogSpotLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            this.group = jsonObject.group;
+            this.binding = jsonObject.binding;
+        } catch(error) {
+            console.log("DogSpotLight: The bind group layouts are automatically created");
+
+            this.bindGroupLayout = null;
+            this.bufferSize = 24 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            this.bindGroup = null; 
+            this.group = -1;
+            this.binding = -1;
+        }
     }
 
     /**
@@ -72,7 +89,6 @@ class SpotLight{
      */
     setColor(color){
         this.color = color;
-        this.hasChange = true;
     }
 
     /**
@@ -81,7 +97,6 @@ class SpotLight{
      */
     setPosition(position){
         this.position = position;
-        this.hasChange = true;
     }
 
     /**
@@ -90,7 +105,6 @@ class SpotLight{
      */
     setDirection(direction){
         this.direction = direction;
-        this.hasChange = true;
     }
 
     /**
@@ -99,7 +113,6 @@ class SpotLight{
      */
     setEnabled(enabled){
         this.enabled = enabled;
-        this.hasChange = true;
     }
 
     /**
@@ -108,7 +121,6 @@ class SpotLight{
      */
     setIntensity(intensity){
         this.intensity = intensity;
-        this.hasChange = true;
     }
 
     /**
@@ -141,7 +153,6 @@ class SpotLight{
      */
     setConstantAttenuation(kc){
         this.kc = kc;
-        this.hasChange = true;
     }
 
     /**
@@ -150,7 +161,6 @@ class SpotLight{
      */
     setLinealAttenuation(kl){
         this.kl = kl;
-        this.hasChange = true;
     }
 
     /**
@@ -159,7 +169,6 @@ class SpotLight{
      */
     setQuadraticAttenuation(kq){
         this.kq = kq;
-        this.hasChange = true;
     }
 
     /**
@@ -176,7 +185,6 @@ class SpotLight{
      */
     setRange(range){
         this.range = range;
-        this.hasChange = true;
     }
 
     /**
@@ -233,7 +241,6 @@ class SpotLight{
      */
     setSpotAngle(angle){
         this.spotAngle = angle;
-        this.hasChange = true;
     }
 
     /**
@@ -242,7 +249,6 @@ class SpotLight{
      */
     setInnerAngle(angle){
         this.spotAngle = angle;
-        this.hasChange = true;
     }
 
     /**
@@ -251,7 +257,6 @@ class SpotLight{
      */
     setExternAngle(angle){
         this.spotAngle = angle;
-        this.hasChange = true;
     }
 
     /**
@@ -260,7 +265,6 @@ class SpotLight{
      */
     setAngleX(angle){
         this.angleX = angle;
-        this.hasChange = true;
         this.rotate();
     }
 
@@ -280,83 +284,42 @@ class SpotLight{
      */
     setAngleZ(angle){
         this.angleZ = angle;
-        this.hasChange = true;
         this.rotate();
     }
 
+    rotate() {
+        const mRot = glMatrix.mat4.create();
+
+        glMatrix.mat4.rotateY(mRot, mRot, this.angleY);
+        glMatrix.mat4.rotateX(mRot, mRot, this.angleX);
+        glMatrix.mat4.rotateZ(mRot, mRot, this.angleZ);
+        glMatrix.vec3.transformMat4(this.direction, this.direction);
+        vec3.transformMat4(this.direction, this.direction, transformMatrix);
+    }
+
+     //----------------------- WebGPU's methods -----------------------
+
     /**
-     * Get the index buffer
-     * @returns {int} Index Buffer
+     * Get the bind group for the spot light.
+     * @returns {GPUBindGroup} Bind group for the spot light.
      */
-    getIndexBuffer(){
-        return this.indexBuffer;
+    getBindGroup(){
+        return this.bindGroup;
     }
 
     /**
-     * Set the binding point for uniform buffer object
-     * @param {int} bp binding point
+     * Get the buffer of the spot light.
+     * @returns {GPUBuffer} Buffer of the spot light.
      */
-    setBindingPoint(bp){
-        this.bindingPoint = bp;
+    getBuffer(){
+        return resourceManager.get(this.idBuffer);
     }
 
     /**
-     * Get the binding point
-     * @returns the binding point of the uniform buffer object
+     * Get the bind group layout of the spot light.
+     * @returns {GPUBindGroupLayout} Bind group layout of the spot light.
      */
-    getBindingPoint(){
-        return this.bindingPoint;
-    }
-
-    rotate(){
-        var mRot = m4.identity();
-        mRot = m4.multiply(mRot, m4.yRotation(this.angleY));
-        mRot = m4.multiply(mRot, m4.xRotation(this.angleX));
-        mRot = m4.multiply(mRot, m4.zRotation(this.angleZ));
-        this.direction = m4.transformDirection(mRot, this.direction);
-    }
-
-    /**
-     * Get a uniform buffer to send the information about material to shader
-     * @param pipeline Pipeline where the uniform block is
-     * @param nameUbo Name of the uniform block in the program of the pipeline
-     * @returns {WebGLBuffer} Uniform buffer to send the information to shader
-     */
-    getBuffer(pipeline, nameUbo){
-        if(this.bindingPoint == -1){
-            console.log("binding point in point light = " + this.bindingPoint);
-            return null;
-        }
-
-        if(this.buffer == null || this.hasChange){
-            this.buffer = webGLengine.createBuffer(gl);
-            gl.bindBufferBase(gl.UNIFORM_BUFFER, this.bindingPoint, this.buffer);
-            gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array([
-                this.position[0], this.position[1], this.position[2], 1.0,
-                this.direction[0], this.direction[1], this.direction[2], 0.0,
-                this.color[0], this.color[1], this.color[2], this.color[3],
-                this.kc,
-                this.kl,
-                this.kq,
-                this.range,
-                this.enabled,
-                this.spotAngle,
-                this.spotInnerAngle,
-                this.spotExternAngle,
-                this.intensity,
-                this.angleX,
-                this.angleY,
-                this.angleZ
-            ]), gl.DYNAMIC_DRAW);
-
-            this.indexBuffer = gl.getUniformBlockIndex(pipeline.getProgram(), nameUbo);
-            gl.uniformBlockBinding(pipeline.getProgram(), this.indexBuffer, this.bindingPoint);
-
-            gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-
-            this.hasChange = false;
-        }
-
-        return this.buffer;
+    getBindGroupLayout(){
+        return this.bindGroupLayout;
     }
 }

@@ -20,10 +20,11 @@ class DogTransform {
 
         this.balanceDeltas();
 
-        const idCount = resourceManager.getCounterID();
+        var idCount = -1;
         
         try {
             const jsonTransform = bindGroupLayouts.get("DogTransform");
+            idCount = resourceManager.getCounterID();
 
             this.idBuffer = webGPUengine.createDogBuffer("DogTransform" + idCount, BufferType.Data, null, jsonTransform.bufferSize, true);
             this.bindGroup = webGPUengine.createBindGroup("DogTransform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));

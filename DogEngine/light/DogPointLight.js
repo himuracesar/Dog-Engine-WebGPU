@@ -4,10 +4,11 @@
  * @author César Himura
  * @version 1.0
  */
-class PointLight {
-
+class DogPointLight {
+    /**
+     * Make an instances of a point light.
+     */
     constructor(){
-        this.buffer = null;
         this.position = [0.0, 0.0, 0.0];
         this.color = [1.0, 1.0, 1.0, 1.0];
         this.range = 1.0;
@@ -16,9 +17,24 @@ class PointLight {
         this.kq = 0.0;
         this.intensity = 1.0;
         this.enabled = true;
-        this.indexBuffer = -1;
-        this.bindingPoint = -1;
-        this.hasChange = false;
+
+        try {
+            const jsonObject = bindGroupLayouts.get("DogPointLight");
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+            this.bindGroup = webGPUengine.createBindGroup("DogPointLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            this.group = jsonObject.group;
+            this.binding = jsonObject.binding;
+        } catch(error) {
+            console.log("DogPointLight: The bind group layouts are automatically created");
+
+            this.bindGroupLayout = null;
+            this.bufferSize = 16 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            this.bindGroup = null; 
+            this.group = -1;
+            this.binding = -1;
+        }
     }
 
     /**
@@ -59,7 +75,6 @@ class PointLight {
      */
     setColor(color){
         this.color = color;
-        this.hasChange = true;
     }
 
     /**
@@ -68,7 +83,6 @@ class PointLight {
      */
     setPosition(position){
         this.position = position;
-        this.hasChange = true;
     }
 
     /**
@@ -77,7 +91,6 @@ class PointLight {
      */
     setEnabled(enabled){
         this.enabled = enabled;
-        this.hasChange = true;
     }
 
     /**
@@ -86,7 +99,6 @@ class PointLight {
      */
     setIntensity(intensity){
         this.intensity = intensity;
-        this.hasChange = true;
     }
 
     /**
@@ -119,7 +131,6 @@ class PointLight {
      */
     setConstantAttenuation(kc){
         this.kc = kc;
-        this.hasChange = true;
     }
 
     /**
@@ -128,7 +139,6 @@ class PointLight {
      */
     setLinealAttenuation(kl){
         this.kl = kl;
-        this.hasChange = true;
     }
 
     /**
@@ -137,7 +147,6 @@ class PointLight {
      */
     setQuadraticAttenuation(kq){
         this.kq = kq;
-        this.hasChange = true;
     }
 
     /**
@@ -154,7 +163,6 @@ class PointLight {
      */
     setRange(range){
         this.range = range;
-        this.hasChange = true;
     }
 
     /**
@@ -165,58 +173,29 @@ class PointLight {
         return this.indexBuffer;
     }
 
+    //----------------------- WebGPU's methods -----------------------
+
     /**
-     * Set the binding point for uniform buffer object
-     * @param {int} bp binding point
+     * Get the bind group for the point light.
+     * @returns {GPUBindGroup} Bind group for the point light.
      */
-    setBindingPoint(bp){
-        this.bindingPoint = bp;
+    getBindGroup(){
+        return this.bindGroup;
     }
 
     /**
-     * Get the binding point
-     * @returns the binding point of the uniform buffer object
+     * Get the buffer of the point light.
+     * @returns {GPUBuffer} Buffer of the point light.
      */
-    getBindingPoint(){
-        return this.bindingPoint;
+    getBuffer(){
+        return resourceManager.get(this.idBuffer);
     }
 
     /**
-     * Get a uniform buffer to send the information about material to shader
-     * @param pipeline Pipeline where the uniform block is
-     * @param nameUbo Name of the uniform block in the program of the pipeline
-     * @returns {WebGLBuffer} Uniform buffer to send the information to shader
+     * Get the bind group layout of the point light.
+     * @returns {GPUBindGroupLayout} Bind group layout of the point light.
      */
-    getBuffer(pipeline, nameUbo){
-        if(this.bindingPoint == -1){
-            console.log("binding point in point light = " + this.bindingPoint);
-            return null;
-        }
-
-        if(this.buffer == null || this.hasChange){
-            this.buffer = webGLengine.createBuffer(gl);
-            gl.bindBufferBase(gl.UNIFORM_BUFFER, this.bindingPoint, this.buffer);
-            gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array([
-                this.position[0], this.position[1], this.position[2], 1.0,
-                this.color[0], this.color[1], this.color[2], this.color[3],
-                this.kc,
-                this.kl,
-                this.kq,
-                this.range,
-                this.enabled ? 1 : 0,
-                this.intensity,
-                0, 0 //padding
-            ]), gl.DYNAMIC_DRAW);
-
-            this.indexBuffer = gl.getUniformBlockIndex(pipeline.getProgram(), nameUbo);
-            gl.uniformBlockBinding(pipeline.getProgram(), this.indexBuffer, this.bindingPoint);
-
-            gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-
-            this.hasChange = false;
-        }
-
-        return this.buffer;
+    getBindGroupLayout(){
+        return this.bindGroupLayout;
     }
-
 }

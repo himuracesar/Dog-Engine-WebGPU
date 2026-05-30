@@ -140,7 +140,7 @@ const GPUVisibility = Object.freeze({
         function createBindGroupLayouts(descriptors = []){
             var bindGroupsLayouts = new Map();
 
-            const desc = [
+            var desc = [
                 { name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex },
                 { name: "DogTransform", label: "Transform", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }
             ]

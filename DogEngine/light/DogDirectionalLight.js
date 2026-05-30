@@ -13,12 +13,27 @@ class DogDirectionalLight {
 	    this.direction = [1.0, -1.0, -1.0, 0.0];
 	    this.enabled = true;
 	    this.intensity = 1.0;
-        this.indexBuffer = -1;
-        this.bindingPoint = -1;
 
-        this.uniformBuffer = this.createUniformBuffer();
-        this.bindGroupLayout = this.createBindGroupLayout();
-        this.bindGroup = this.createBindGroup();
+        var idCount = -1;
+
+        try {
+            const jsonObject = bindGroupLayouts.get("DogDirectionalLight");
+            idCount = resourceManager.getCounterID();
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+            this.bindGroup = webGPUengine.createBindGroup("DogDirectionalLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            this.group = jsonObject.group;
+            this.binding = jsonObject.binding;
+        } catch(error) {
+            console.log("DogDirectionalLight: The bind group layouts are automatically created");
+
+            this.bindGroupLayout = null;
+            this.bufferSize = 16 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            this.bindGroup = null; 
+            this.group = -1;
+            this.binding = -1;
+        }
     }
 
     /**
@@ -104,87 +119,50 @@ class DogDirectionalLight {
     //----------------------- WebGPU's methods -----------------------
 
     /**
-     * Create the uniform buffer for the directional light.
-     * @returns {GPUBuffer} Uniform buffer for the light.
-     */
-    createUniformBuffer(){
-        const bufferSize = 16 * 4; // Matrix4x4 has 16 floats, each float is 4 bytes.
-        const buffer = pGraphics.device.createBuffer({
-            size: bufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        
-        return buffer;
-    }
-
-    /**
-     * Create the bind group layout for the camera. The bind group layout defines the layout of the bind group, 
-     * which is used to bind the uniform buffer to the shader.
-     * @returns {GPUBindGroupLayout} Bind group layout for the directional light.
-     */
-    createBindGroupLayout(){
-        const bindGroupLayout = pGraphics.device.createBindGroupLayout({
-            entries: [{
-                binding: 0,                           // Same index as in the bindGroup
-                visibility: GPUShaderStage.VERTEX,    // In which stages is visible
-                buffer: {
-                    type: "uniform"                     // uniform buffer (default)
-                }
-            }]
-        });
-
-        return bindGroupLayout;
-    }
-
-    /**
-     * Create the bind group for the directional light. First create the bind group layout and then create 
-     * the bind group with the uniform buffer of the directional light.
-     * @returns {GPUBindGroup} Bind group for the camera.
-     */
-    createBindGroup(){
-        const bindGroup = pGraphics.device.createBindGroup({
-            layout: this.bindGroupLayout,
-            entries: [{
-                binding: 0,
-                resource: { buffer: this.uniformBuffer }
-            }],
-        });
-
-        return bindGroup;
-    }
-
-    /**
-     * Get the bind group for the camera.
-     * @returns {GPUBindGroup} Bind group for the camera.
+     * Get the bind group for the directional light.
+     * @returns {GPUBindGroup} Bind group for the directional light.
      */
     getBindGroup(){
         return this.bindGroup;
     }
 
     /**
-     * Get the uniform buffer of the camera.
-     * @returns {GPUBuffer} Uniform buffer of the camera.
+     * Get the buffer of the directional light.
+     * @returns {GPUBuffer} Buffer of the directional light.
      */
-    getUniformBuffer(){
-        return this.uniformBuffer;
+    getBuffer(){
+        return resourceManager.get(this.idBuffer);
     }
 
     /**
-     * Get the bind group layout of the camera.
-     * @returns {GPUBindGroupLayout} Bind group layout of the camera.
+     * Get the bind group layout of the directional light.
+     * @returns {GPUBindGroupLayout} Bind group layout of the directional light.
      */
     getBindGroupLayout(){
         return this.bindGroupLayout;
     }
 
-    /*
-    gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array([
-        this.position[0], this.position[1], this.position[2], this.position[3], --> 4
-        this.direction[0], this.direction[1], this.direction[2], this.direction[3], --> 4
-        this.color[0], this.color[1], this.color[2], this.color[3], --> 4
-        this.enabled ? 1 : 0, --> 1
-        this.intensity, --> 1
-        0, 0 //padding
-    ]), gl.DYNAMIC_DRAW);
-    */
+    /**
+     * Gets the group to belong this component in the shaders.
+     * @returns {int} group Group
+     */
+    getGroup(){
+        return this.group;
+    }
+
+    /**
+     * Get the data of the directional light in an array of float32. The spread (...) is necessary to
+     * flat the data correctly in float.
+     * @returns {Float32Array} Data to send to shader.
+     */
+    getData() {
+        return new Float32Array([
+            ...this.position,
+            ...this.direction,
+            ...this.color,
+            this.enabled ? 1 : 0,
+            this.intensity,
+            0, 0 //padding
+        ]);
+    }
 }
