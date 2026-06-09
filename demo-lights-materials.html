@@ -116,7 +116,10 @@
     <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
     <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
     <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogMaterial.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogDirectionalLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
@@ -148,7 +151,10 @@
 
         var sphere;
     
+        var material = null;
         var directionalLight = null;
+        var pointLight = null;
+        var spotLight = null;
 
         var scalingFactor = 0.01;
 
@@ -184,18 +190,23 @@
         }
 
         function createPipeline(){
-            const bglPhong = [];
-            bglPhong.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
-            bglPhong.push(bindGroupLayouts.get("DogTransform").bindGroupLayout);
-            bglPhong.push(bindGroupLayouts.get("DogDirectionalLight").bindGroupLayout);
+            const bglPhong = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                //resourceManager.getConfigComponentByName("DogDirectionalLight").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogPointLight").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogMaterial").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout,
+            ];
 
             phongShadingPipeline = new PhongShadingPipeline(bglPhong);
 
-            const bglWireframe = [];
-            bglWireframe.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
-            bglWireframe.push(bindGroupLayouts.get("DogTransform").bindGroupLayout);
+            const bglWireframe = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout, 
+                undefined, // Bind group 1 is not used in this demo
+                propsBindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
 
-            bglWireframe.push(propsBindGroupLayout);
             wireframePipeline = new WireframePipeline(bglWireframe);
 
             depthTexture = pGraphics.device.createTexture({
@@ -239,6 +250,15 @@
         function createLightsMaterials() {
             directionalLight = new DogDirectionalLight();
             directionalLight.setColor([1.0, 0.0, 0.0, 1.0]);
+
+            pointLight = new DogPointLight();
+            pointLight.setColor([0.0, 1.0, 0.0, 1.0]);
+
+            spotLight = new DogSpotLight();
+            spotLight.setColor([0.0, 0.0, 1.0, 1.0]);
+
+            material = new DogMaterial();
+            material.setDiffuseColor([0.0, 1.0, 0.0, 1.0]);
         }
 
         //------------------ End demo's main functons -----------------
@@ -257,16 +277,20 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
+            resourceManager = new DogResourceManager();
+
             const groupLayouts = [
-                { name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex },
-                { name: "DogTransform", label: "Transform", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex },
-                { name: "DogDirectionalLight", label: "Directional Light", group: 2, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
-                //{ name: "DogMaterial", label: "Material", group: 2, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment }
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [
+                    { name: "DogDirectionalLight", label: "Directional Light", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
+                    { name: "DogPointLight", label: "Point Light", group: 1, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
+                    { name: "DogSpotLight", label: "Spot Light", group: 1, binding: 2, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }
+                ],
+                [{ name: "DogMaterial", label: "Material", group: 2, binding: 0, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }],
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
             ];
 
-            bindGroupLayouts = webGPUengine.createBindGroupLayouts(groupLayouts);
-
-            resourceManager = new DogResourceManager();
+            webGPUengine.createBindGroupLayouts(groupLayouts);
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 100.0]);
@@ -274,10 +298,10 @@
             camera.setFarPlane(4000.0);
             
             createShapes();
+            createLightsMaterials();
             createProps();
             createPipeline();
-            createLightsMaterials();
-
+            
             requestAnimationFrame(updateAndRender);
         }
 
@@ -398,11 +422,17 @@
 
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            pGraphics.device.queue.writeBuffer(material.getBuffer().getWebGPUBuffer(), 0, material.getData());
             pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
+            pGraphics.device.queue.writeBuffer(pointLight.getBuffer().getWebGPUBuffer(), 0, pointLight.getData());
+            pGraphics.device.queue.writeBuffer(spotLight.getBuffer().getWebGPUBuffer(), 0, spotLight.getData());
 
             //pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
             pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-            pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
+            //pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
+            pass.setBindGroup(pointLight.getGroup(), pointLight.getBindGroup());
+            pass.setBindGroup(material.getGroup(), material.getBindGroup());
 
             pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
 

@@ -137,14 +137,14 @@
         
         var angle = 0.0;
 
+        var resourceManager;
+
         var vertexBuffer;
         var indexBuffer;
 
         var colorPipeline;
 
         var camera;
-
-         var bindGroupLayouts;
 
         var modelMatrix;
         var modelBuffer;
@@ -230,7 +230,7 @@
 
         function createPipeline(){
             var bgl = [];
-            bgl.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
+            bgl.push(resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout);
             bgl.push(modelBindGroupLayout);
 
             colorPipeline = new ColorPipeline(bgl);
@@ -286,7 +286,14 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            bindGroupLayouts = webGPUengine.createBindGroupLayouts();
+            resourceManager = new DogResourceManager();
+
+            const groupLayouts = [
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
+            ];
+
+            webGPUengine.createBindGroupLayouts(groupLayouts);
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);

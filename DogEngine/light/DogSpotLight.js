@@ -24,19 +24,28 @@ class DogSpotLight {
         this.intensity = 1.0;
         this.enabled = true;
 
-        try {
-            const jsonObject = bindGroupLayouts.get("DogSpotLight");
+        var idCount = -1;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("DogSpotLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+        try {
+            const jsonObject = resourceManager.getConfigComponentByName("DogSpotLight");
+            idCount = resourceManager.getCounter();
+
             this.group = jsonObject.group;
             this.binding = jsonObject.binding;
+
+            if(jsonObject.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogSpotLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonObject.idBuffer;
+                this.bindGroup = jsonObject.bindGroup;
+            }
         } catch(error) {
             console.log("DogSpotLight: The bind group layouts are automatically created");
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 24 * 4;
-            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            const bufferSize = 24 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight"  + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
@@ -316,10 +325,35 @@ class DogSpotLight {
     }
 
     /**
-     * Get the bind group layout of the spot light.
-     * @returns {GPUBindGroupLayout} Bind group layout of the spot light.
+     * Gets the group to belong this component in the shaders.
+     * @returns {int} group Group
      */
-    getBindGroupLayout(){
-        return this.bindGroupLayout;
+    getGroup(){
+        return this.group;
+    }
+    
+    /**
+     * Get the data of the spot light in an array of float32. The spread (...) is necessary to
+     * flat the data correctly in float.
+     * @returns {Float32Array} Data to send to shader.
+     */
+    getData() {
+        return new Float32Array([
+            ...this.position,
+            ...this.direction,
+            ...this.color,
+            this.kc,
+            this.kl,
+            this.kq,
+            this.range,
+            this.enabled ? 1 : 0,
+            this.spotAngle,
+            this.spotInnerAngle,
+            this.spotExternAngle,
+            this.intensity,
+            this.angleX,
+            this.angleY,
+            this.angleZ
+        ]);
     }
 }

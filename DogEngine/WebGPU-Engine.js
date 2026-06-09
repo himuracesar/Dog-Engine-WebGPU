@@ -19,6 +19,9 @@ function include(file) {
 }
 
 //----------- Include other js files here ----------------
+include("/DogEngine/dataStructures/GeeksNode.js");
+include("/DogEngine/dataStructures/GeeksQueue.js");
+
 include("/DogEngine/DogResource.js");
 include("/DogEngine/DogBuffer.js");
 include("/DogEngine/DogTransform.js");
@@ -125,6 +128,9 @@ const GPUVisibility = Object.freeze({
                 format: canvasFormat,
             });
 
+            console.log("Max Uniform Buffers per group: ", device.limits.maxUniformBuffersPerShaderStage);
+            console.log("Max Bind Groups simultaneously: ", device.limits.maxBindGroups); // El mínimo garantizado es 4
+
             return {
                 device: device,
                 context: context,
@@ -138,34 +144,116 @@ const GPUVisibility = Object.freeze({
          * @returns {Array} Array of bind group layouts of WebGPU.
          */
         function createBindGroupLayouts(descriptors = []){
-            var bindGroupsLayouts = new Map();
+            var bindGroupsLayouts = [];
 
             var desc = [
-                { name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex },
-                { name: "DogTransform", label: "Transform", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }
-            ]
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [{ name: "DogTransform", label: "Transform", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
+            ];
 
             if(descriptors.length > 0)
                 desc = descriptors;
 
+            var idBindGroupLayout = -1;
             for(var i = 0; i < desc.length; i++){
                 var bgl = desc[i];
 
+                idBindGroupLayout++;
+
+                const entries = [];
+                for(var j = 0; j < bgl.length; j++){
+                    const e = {
+                        binding: bgl[j].binding,
+                        visibility: bgl[j].visibility,
+                        buffer: { type: "uniform" }
+                    };          
+                    
+                    entries.push(e);
+
+                    var idCount = -1;
+
+                    try {
+                        idCount = resourceManager.getCounter();
+                    } catch (error) {
+                        console.log("WebGPUEngine::createBindGroupLayouts - The Resource Managaer is not initialized:", error);
+                    }
+
+                    const idBuffer = createDogBuffer(bgl[j].name + idCount, BufferType.Data, null, bgl[j].bufferSize, true);
+
+                    bindGroupsLayouts.push({ 
+                        name: bgl[j].name, 
+                        group: bgl[j].group, 
+                        binding: bgl[j].binding, 
+                        idBindGroupLayout: idBindGroupLayout,
+                        bindGroupLayout: null, 
+                        bufferSize: bgl[j].bufferSize, 
+                        idBuffer: idBuffer, 
+                        bindGroup: null
+                    });
+                }
+
                 const bindGroupLayout = pGraphics.device.createBindGroupLayout({
                     label: bgl.label,
-                    entries: [{
-                        binding: bgl.binding,
-                        visibility: bgl.visibility,
-                        buffer: {
-                            type: "uniform"
-                        }
-                    }]
+                    entries: entries
                 });
-                
-                bindGroupsLayouts.set(bgl.name, { group: bgl.group, binding: bgl.binding, bindGroupLayout: bindGroupLayout, bufferSize: bgl.bufferSize });
+            
+                const start = bindGroupsLayouts.length-1;
+                const length = bindGroupsLayouts.length - bgl.length;
+                for(var j = start; j >= length; j--){
+                    bindGroupsLayouts[j].bindGroupLayout = bindGroupLayout;
+                } 
+            }
+            
+            bindGroupsLayouts = createBindGroups(bindGroupsLayouts);
+
+            const bindings = new Map();
+            for(var i = 0; i < bindGroupsLayouts.length; i++){
+                if(!bindings.has(bindGroupsLayouts[i].name))
+                    bindings.set(bindGroupsLayouts[i].name, new GeeksQueue());
+
+                bindings.get(bindGroupsLayouts[i].name).enqueue(bindGroupsLayouts[i]);
             }
 
-            return bindGroupsLayouts;
+            resourceManager.setConfigComponents(bindings);
+            return bindings;
+        }
+
+        /**
+         * Create the bind groups with the bind group layouts and buffers of the input array.
+         * The second loop is to set the same bind group to the JSON objects with the same bind group layout, because they are the same bind group.
+         * @param {Array of JSON objects} input Array of JSON objects with the information to create the bind groups.
+         * @returns {Array} Array of JSON objects with the bind groups created. Each JSON object has the same information as the input plus the bind group created.
+         */
+        function createBindGroups(input) {
+            var entries = [];
+            for(var i = 0; i < input.length; i++){
+                const buffer = resourceManager.get(input[i].idBuffer);
+
+                const e = {
+                    binding: input[i].binding,
+                    resource: { buffer: buffer.getWebGPUBuffer() }
+                };       
+                
+                entries.push(e);
+
+                if(i+1 < input.length && input[i].idBindGroupLayout == input[i+1].idBindGroupLayout)
+                    continue;
+
+                const bindGroup = pGraphics.device.createBindGroup({
+                    label: input[i].label,
+                    layout: input[i].bindGroupLayout,
+                    entries: entries,
+                });
+
+                input[i].bindGroup = bindGroup;
+                entries = [];
+            }
+
+            for(var i = input.length-1; i > 0; i--)
+                if(input[i-1].idBindGroupLayout == input[i].idBindGroupLayout)
+                    input[i-1].bindGroup = input[i].bindGroup;
+                
+            return input;
         }
 
         /**

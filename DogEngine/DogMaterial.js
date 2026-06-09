@@ -22,19 +22,28 @@ class DogMaterial {
         this.fresnel = 0.0;
         this.has_Texture = false;
 
-        try {
-            const jsonObject = bindGroupLayouts.get("DogMaterial");
+        var idCount = -1;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("DogMaterial", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+        try {
+            const jsonObject = resourceManager.getConfigComponentByName("DogMaterial");
+            idCount = resourceManager.getCounter();
+
             this.group = jsonObject.group;
             this.binding = jsonObject.binding;
+
+            if(jsonObject.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogMaterial" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogMaterial", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonObject.idBuffer;
+                this.bindGroup = jsonObject.bindGroup;
+            }
         } catch(error) {
             console.log("DogMaterial: The bind group layouts are automatically created");
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 24 * 4;
-            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            const bufferSize = 24 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial"  + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
@@ -122,11 +131,11 @@ class DogMaterial {
     }
 
     /**
-     * Set the inde of bump map
+     * Set the index of bump map
      * @param {int} index Index
      */
     setBumpMapIndex(index){
-        this.normalMapIndex = index;
+        this.bumpMapIndex = index;
     }
 
     /**
@@ -202,12 +211,12 @@ class DogMaterial {
         return resourceManager.get(this.idBuffer);
     }
 
-    /**
-     * Get the bind group layout of the material.
-     * @returns {GPUBindGroupLayout} Bind group layout of the material.
+     /**
+     * Gets the group to belong this component in the shaders.
+     * @returns {int} group Group
      */
-    getBindGroupLayout(){
-        return this.bindGroupLayout;
+    getGroup(){
+        return this.group;
     }
 
     /**

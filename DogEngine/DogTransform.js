@@ -23,19 +23,25 @@ class DogTransform {
         var idCount = -1;
         
         try {
-            const jsonTransform = bindGroupLayouts.get("DogTransform");
-            idCount = resourceManager.getCounterID();
+            const jsonTransform = resourceManager.getConfigComponentByName("DogTransform");
+            
+            if(jsonTransform.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogTransform" + idCount, BufferType.Data, null, jsonTransform.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogTransform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonTransform.idBuffer;
+                this.bindGroup = jsonTransform.bindGroup;
+            }
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogTransform" + idCount, BufferType.Data, null, jsonTransform.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("DogTransform", jsonTransform.binding, jsonTransform.bindGroupLayout, resourceManager.get(this.idBuffer));
             this.group = jsonTransform.group;
             this.binding = jsonTransform.binding;
         } catch(error) {
             console.log("The bind group layouts are automatically created");
+        
+            const bufferSize = 16 * 4 * 2;
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 16 * 4 * 2;
-            this.idBuffer = webGPUengine.createDogBuffer("DogTransform"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogTransform"  + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;

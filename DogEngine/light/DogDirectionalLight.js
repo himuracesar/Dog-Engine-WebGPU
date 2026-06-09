@@ -17,19 +17,25 @@ class DogDirectionalLight {
         var idCount = -1;
 
         try {
-            const jsonObject = bindGroupLayouts.get("DogDirectionalLight");
-            idCount = resourceManager.getCounterID();
+            const jsonObject = resourceManager.getConfigComponentByName("DogDirectionalLight");
+            idCount = resourceManager.getCounter();
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("DogDirectionalLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
             this.group = jsonObject.group;
             this.binding = jsonObject.binding;
+
+            if(jsonObject.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogDirectionalLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonObject.idBuffer;
+                this.bindGroup = jsonObject.bindGroup;
+            }
         } catch(error) {
             console.log("DogDirectionalLight: The bind group layouts are automatically created");
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 16 * 4;
-            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            const bufferSize = 16 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight"  + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
@@ -132,14 +138,6 @@ class DogDirectionalLight {
      */
     getBuffer(){
         return resourceManager.get(this.idBuffer);
-    }
-
-    /**
-     * Get the bind group layout of the directional light.
-     * @returns {GPUBindGroupLayout} Bind group layout of the directional light.
-     */
-    getBindGroupLayout(){
-        return this.bindGroupLayout;
     }
 
     /**

@@ -137,6 +137,8 @@
         
         var angle = 0.0;
 
+        var resourceManager;
+
         var vertexBuffer;
         var indexBuffer;
 
@@ -280,12 +282,14 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
+            resourceManager = new DogResourceManager();
+
+            webGPUengine.createBindGroupLayouts();
+
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);
             camera.setSpeed(0.2);
             camera.setFarPlane(4000.0);
-
-            
 
             createShapes();
             createPipeline();

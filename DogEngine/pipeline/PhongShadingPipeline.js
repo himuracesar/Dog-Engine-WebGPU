@@ -38,7 +38,8 @@ class PhongShadingPipeline extends DogPipeline {
                 roughness : f32,
                 metallness : f32,
                 hasTexture : f32,
-                padding : vec2<f32>
+                fresnel : f32,
+                padding : f32
             };
 
             struct DirectionalLight {
@@ -50,17 +51,53 @@ class PhongShadingPipeline extends DogPipeline {
                 padding : vec2<f32>
             };
 
+            struct PointLight {
+                position : vec4<f32>,
+                color : vec4<f32>,
+                kc : f32, //Constant Attenuation
+                kl : f32, //Linear Attenuation
+                kq : f32, //Quadratic Attenuation
+                range : f32,
+                enabled : f32,
+                intensity : f32,
+                padding : vec2<f32>
+            };
+
+            struct SpotLight {
+                position : vec4<f32>,
+                direction : vec4<f32>,
+                color : vec4<f32>,
+                kc : f32, //Constant Attenuation
+                kl : f32, //Linear Attenuation
+                kq : f32, //Quadratic Attenuation
+                range : f32,
+                enabled : f32,
+                spotAngle : f32,
+                spotInnerAngle : f32,
+                spotExternAngle : f32,
+                intensity : f32,
+                angleX : f32,
+                angleY : f32,
+                angleZ : f32
+            };
+
             @group(0) @binding(0)
             var<uniform> camera: Camera;
 
             @group(1) @binding(0)
-            var<uniform> model: Model;
-
-            @group(2) @binding(0)
             var<uniform> directionalLight: DirectionalLight;
 
-            @group(2) @binding(1)
+            @group(1) @binding(1)
+            var<uniform> pointLight: PointLight;
+
+            @group(1) @binding(2)
+            var<uniform> spotLight: SpotLight;
+
+            @group(2) @binding(0)
             var<uniform> material: Material;
+
+            @group(3) @binding(0)
+            var<uniform> model: Model;
 
             @vertex
             fn vertexMain(
@@ -83,8 +120,9 @@ class PhongShadingPipeline extends DogPipeline {
 
             @fragment
             fn fragmentMain(@location(1) normal: vec3f, @location(2) texCoord: vec2f) -> @location(0) vec4f {
-                return vec4f(directionalLight.color.rgb, 1.0);
+                return vec4f(pointLight.color.rgb, 1.0);
                 //return vec4f(1.0, 0.0, 0.0, 1.0);
+                //return vec4f(material.diffuseColor.rgb, 1.0);
             }
         `;
 

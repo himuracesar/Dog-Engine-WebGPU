@@ -18,19 +18,28 @@ class DogPointLight {
         this.intensity = 1.0;
         this.enabled = true;
 
-        try {
-            const jsonObject = bindGroupLayouts.get("DogPointLight");
+        var idCount = -1;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
-            this.bindGroup = webGPUengine.createBindGroup("DogPointLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+        try {
+            const jsonObject = resourceManager.getConfigComponentByName("DogPointLight");
+            idCount = resourceManager.getCounter();
+
             this.group = jsonObject.group;
             this.binding = jsonObject.binding;
-        } catch(error) {
-            console.log("DogPointLight: The bind group layouts are automatically created");
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 16 * 4;
-            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight"  + idCount, BufferType.Data, null, this.bufferSize, true);
+            if(jsonObject.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogPointLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogPointLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonObject.idBuffer;
+                this.bindGroup = jsonObject.bindGroup;
+            }
+        } catch(error) {
+            console.log("DogPointLight: The bind group layouts are automatically created " + error);
+
+            const bufferSize = 16 * 4;
+            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight"  + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
@@ -165,14 +174,6 @@ class DogPointLight {
         this.range = range;
     }
 
-    /**
-     * Get the index buffer
-     * @returns {int} Index Buffer
-     */
-    getIndexBuffer(){
-        return this.indexBuffer;
-    }
-
     //----------------------- WebGPU's methods -----------------------
 
     /**
@@ -192,10 +193,29 @@ class DogPointLight {
     }
 
     /**
-     * Get the bind group layout of the point light.
-     * @returns {GPUBindGroupLayout} Bind group layout of the point light.
+     * Gets the group to belong this component in the shaders.
+     * @returns {int} group Group
      */
-    getBindGroupLayout(){
-        return this.bindGroupLayout;
+    getGroup(){
+        return this.group;
+    }
+
+    /**
+     * Get the data of the point light in an array of float32. The spread (...) is necessary to
+     * flat the data correctly in float.
+     * @returns {Float32Array} Data to send to shader.
+     */
+    getData() {
+        return new Float32Array([
+            ...this.position,
+            ...this.color,
+            this.kc,
+            this.kl,
+            this.kq,
+            this.range,
+            this.enabled ? 1 : 0,
+            this.intensity,
+            0, 0 //padding
+        ]);
     }
 }

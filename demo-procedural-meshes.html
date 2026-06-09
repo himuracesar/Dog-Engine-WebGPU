@@ -224,13 +224,22 @@
         }
 
         function createPipeline(){
-            var bgl = [];
-            bgl.push(bindGroupLayouts.get("DogCamera").bindGroupLayout);
-            bgl.push(bindGroupLayouts.get("DogTransform").bindGroupLayout);
-
+            var bgl = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                undefined, // Bind group 1 is not used in this demo
+                undefined, // Bind group 2 is set dynamically during rendering
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
+            
             normalColorPipeline = new NormalColorPipeline(bgl);
 
-            bgl.push(propsBindGroupLayout);
+            bgl = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                undefined, // Bind group 1 is not used in this demo
+                propsBindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
+            
             wireframePipeline = new WireframePipeline(bgl);
 
             depthTexture = pGraphics.device.createTexture({
@@ -256,6 +265,7 @@
                 size: propsData.byteLength,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
+
             pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
             
             propsBindGroup = pGraphics.device.createBindGroup({
@@ -289,9 +299,14 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            bindGroupLayouts = webGPUengine.createBindGroupLayouts();
-
             resourceManager = new DogResourceManager();
+
+            const groupLayouts = [
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
+            ];
+
+            webGPUengine.createBindGroupLayouts(groupLayouts);
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 100.0]);

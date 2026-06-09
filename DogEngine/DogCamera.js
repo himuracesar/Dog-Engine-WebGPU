@@ -28,21 +28,28 @@ class DogCamera {
         this.speedRotation = 0.005;
         this.velocity = [0.0, 0.0, 0.0];
 
-        try{
-            const jsonCamera = bindGroupLayouts.get("DogCamera");
+        var idCount = -1;
 
-            this.bindGroupLayout = jsonCamera.bindGroupLayout;
-            this.bufferSize = jsonCamera.bufferSize || 16 * 4 * 2;
-            this.buffer = new DogBuffer("Camera", BufferType.Data, null, this.bufferSize);
-            this.bindGroup = webGPUengine.createBindGroup("Camera", jsonCamera.binding, this.bindGroupLayout, this.buffer);
+        try{
+            const jsonCamera = resourceManager.getConfigComponentByName("DogCamera");
+            
             this.group = jsonCamera.group;
             this.binding = jsonCamera.binding;
-        } catch(error) {
-            console.log("The bind group layouts are automatically created");
 
-            this.bindGroupLayout = null;
-            this.bufferSize = 16 * 4 * 2;
-            this.buffer = new DogBuffer("Camera", BufferType.Data, null, this.bufferSize);
+            if(jsonCamera.idBuffer == -1) {
+                idCount = resourceManager.getCounter();
+                this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, jsonCamera.bufferSize, true);
+                this.bindGroup = webGPUengine.createBindGroup("DogCamera", jsonCamera.binding, jsonCamera.bindGroupLayout, resourceManager.get(this.idBuffer));
+            } else {
+                this.idBuffer = jsonCamera.idBuffer;
+                this.bindGroup = jsonCamera.bindGroup;
+            }
+        } catch(error) {
+            console.log("The bind group layouts are automatically created" + error);
+
+            const bufferSize = 16 * 4 * 2;
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, bufferSize, true);
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
@@ -308,7 +315,7 @@ class DogCamera {
      * @returns {GPUBuffer} Uniform buffer of the camera.
      */
     getBuffer(){
-        return this.buffer;
+        return resourceManager.get(this.idBuffer);
     }
 
     /**
