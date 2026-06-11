@@ -61,6 +61,7 @@
         #ui-geometry { top: 10px; right: 20px; }
         #ui-performance { bottom: 20px; left: 10px; width: 200px; }
         #ui-config { top: 10px; left: 10px; }
+        #ui-lights { top: 10px; right: 20px; }
         
         .label { position: fixed; bottom: 10px; right: 20px; color: #555; font-size: 12px; }
     </style>
@@ -76,6 +77,24 @@
         // Global state for the configuration parameters
         var configState = {
             background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+        };
+
+        var directionalLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            direction: { x: 1.0, y: -1.0, z: -1.0 },
+            enabled: true,
+            intensity: 1.0
+        };
+
+        var  pointLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            position: { x: 0.0, y: 50.0, z: 0.0 },
+            enabled: true,
+            intensity: 1.0,
+            range: 1.0,
+            kc: 0.0,
+            kl: 0.0,
+            kq: 0.0
         };
     </script>
 
@@ -95,16 +114,48 @@
         const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
         paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
 
+        // --- Widget 3: Lights  ---
+        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights' });
+        const directionalLightFolder = paneLights.addFolder({
+            title: 'Directional Light',
+            expanded: false,   // optional
+        });
+
+        directionalLightFolder.addBinding(directionalLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+
+        const pointLightFolder = paneLights.addFolder({
+            title: 'Point Light',
+            expanded: false,   // optional
+        });
+
+        pointLightFolder.addBinding(pointLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'position', { vector: { type: 'float' } }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'range', { label: 'Range', min: 0, max: 10000, step: 1}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kc', { label: 'Constant Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kl', { label: 'Linear Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kq', { label: 'Quadratic Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+
         // Send data to the engine
         function emitUI() {
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: pointLightState }));
         }
 
         // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
         setInterval(() => {
             panePerformance.refresh();
         }, 100);
+
+        window.addEventListener(EVT_INIT, (e) => {
+            paneLights.refresh();
+        });
 
         // Emit initial state
         emitUI();
@@ -140,6 +191,7 @@
         /******* Events' names for clean communication *******/
         const EVT_DATA = 'engine-data-update';
         const EVT_UI = 'ui-params-change';
+        const EVT_INIT = 'engine-init';
         //***************************************************
         
         var phongShadingPipeline;
@@ -249,16 +301,50 @@
 
         function createLightsMaterials() {
             directionalLight = new DogDirectionalLight();
-            directionalLight.setColor([1.0, 0.0, 0.0, 1.0]);
 
             pointLight = new DogPointLight();
-            pointLight.setColor([0.0, 1.0, 0.0, 1.0]);
+            pointLight.setColor([1.0, 1.0, 1.0, 1.0]);
+            pointLight.setPosition([0.0, 100.0, 0.0]);
+            pointLight.setRange(80);
+            pointLight.setColor([0.99, 0.99, 0.99, 1.0]);
+            pointLight.setLinealAttenuation(0.125);
+            pointLight.setConstantAttenuation(0.2);
+            pointLight.setQuadraticAttenuation(0.003);
+            pointLight.setIntensity(10.0);
 
             spotLight = new DogSpotLight();
             spotLight.setColor([0.0, 0.0, 1.0, 1.0]);
 
             material = new DogMaterial();
-            material.setDiffuseColor([0.0, 1.0, 0.0, 1.0]);
+            material.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
+            material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
+            material.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
+
+            directionalLightState.color.r = directionalLight.getColor()[0];
+            directionalLightState.color.g = directionalLight.getColor()[1];
+            directionalLightState.color.b = directionalLight.getColor()[2];
+            directionalLightState.color.a = directionalLight.getColor()[3];
+            directionalLightState.direction.x = directionalLight.getDirection()[0];
+            directionalLightState.direction.y = directionalLight.getDirection()[1];
+            directionalLightState.direction.z = directionalLight.getDirection()[2];
+            directionalLightState.enabled = directionalLight.isEnabled();
+            directionalLightState.intensity = directionalLight.getIntensity();
+
+            pointLightState.color.r = pointLight.getColor()[0];
+            pointLightState.color.g = pointLight.getColor()[1];
+            pointLightState.color.b = pointLight.getColor()[2];
+            pointLightState.color.a = pointLight.getColor()[3];
+            pointLightState.position.x = pointLight.getPosition()[0];
+            pointLightState.position.y = pointLight.getPosition()[1];
+            pointLightState.position.z = pointLight.getPosition()[2];
+            pointLightState.enabled = pointLight.isEnabled();
+            pointLightState.intensity = pointLight.getIntensity();
+            pointLightState.range = pointLight.getRange();
+            pointLightState.kc = pointLight.getConstantAttenuation();
+            pointLightState.kl = pointLight.getLinealAttenuation();
+            pointLightState.kq = pointLight.getQuadraticAttenuation();
+
+             window.dispatchEvent(new CustomEvent(EVT_INIT, { }));
         }
 
         //------------------ End demo's main functons -----------------
@@ -280,14 +366,14 @@
             resourceManager = new DogResourceManager();
 
             const groupLayouts = [
-                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }], // 2 matrices: view and projection
                 [
                     { name: "DogDirectionalLight", label: "Directional Light", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
                     { name: "DogPointLight", label: "Point Light", group: 1, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
                     { name: "DogSpotLight", label: "Spot Light", group: 1, binding: 2, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }
                 ],
                 [{ name: "DogMaterial", label: "Material", group: 2, binding: 0, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }],
-                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }]
             ];
 
             webGPUengine.createBindGroupLayouts(groupLayouts);
@@ -391,6 +477,23 @@
             lastTime = time;
             
             performanceState.fps = 1000 / dt;
+
+            //--------------- update lights and materials from the UI state ---------------
+            directionalLight.setDirection([directionalLightState.direction.x, directionalLightState.direction.y, directionalLightState.direction.z, 0.0]);
+            directionalLight.setColor([directionalLightState.color.r, directionalLightState.color.g, directionalLightState.color.b, directionalLightState.color.a]);
+            directionalLight.setEnabled(directionalLightState.enabled);
+            directionalLight.setIntensity(directionalLightState.intensity);
+
+            pointLight.setPosition([pointLightState.position.x, pointLightState.position.y, pointLightState.position.z, 1.0]);
+            pointLight.setColor([pointLightState.color.r, pointLightState.color.g, pointLightState.color.b, pointLightState.color.a]);
+            pointLight.setEnabled(pointLightState.enabled);
+            pointLight.setIntensity(pointLightState.intensity);
+            pointLight.setRange(pointLightState.range);
+            pointLight.setConstantAttenuation(pointLightState.kc);
+            pointLight.setLinealAttenuation(pointLightState.kl);
+            pointLight.setQuadraticAttenuation(pointLightState.kq);
+
+            //--------------- end update lights and materials from the UI state ---------------
 
             input();
 

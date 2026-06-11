@@ -11,7 +11,7 @@ class DogMaterial {
         this.diffuseColor = [0.0, 0.0, 0.0, 1.0];
         this.specularColor = [0.0, 0.0, 0.0, 1.0];
         this.emissiveColor = [0.0, 0.0, 0.0, 1.0];
-        this.specularPower = 0.0;
+        this.specularPower = 32.0;
         this.transparency = 1;
         this.opticalDensity = 1; //Ni obj file
         this.diffuseTextureIndex = -1;
