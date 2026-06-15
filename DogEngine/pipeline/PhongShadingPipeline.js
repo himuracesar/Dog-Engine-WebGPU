@@ -1,3 +1,4 @@
+//import { STRUCTS_LIGHTS_AND_MATERIAL } from '/DogEngine/pipeline/structs/LightsAndMaterial.js';
 
 /**
  * it implements Phong shading technique
@@ -6,12 +7,15 @@
  * @version 1.0
  */
 class PhongShadingPipeline extends DogPipeline {
+
     /**
      * Creates a new PhongShadingPipeline instance.
      * @param {GPUBindGroupLayout[]} bindGroupLayouts List of bind group layouts to be used in the pipeline.
      */
     constructor(bindGroupLayouts = []) {
-        const shader =  `
+        const shader = `
+            ${ STRUCTS_LIGHTS_AND_MATERIAL }
+
             struct VertexOutput {
                 @builtin(position) Position : vec4<f32>,
                 @location(1) normal : vec3<f32>,
@@ -26,67 +30,6 @@ class PhongShadingPipeline extends DogPipeline {
 
             struct Model {
                 modelMatrix : mat4x4<f32>
-            };
-
-            struct Material {
-                diffuseColor : vec4<f32>,
-                specularColor : vec4<f32>,
-                ambientColor : vec4<f32>,
-                emissiveColor : vec4<f32>,
-                specularPower : f32,
-                transparency : f32,
-                opticalDensity : f32, 
-                roughness : f32,
-                metallness : f32,
-                hasTexture : f32,
-                fresnel : f32,
-                padding : f32
-            };
-
-            struct DirectionalLight {
-                position : vec4<f32>,
-                direction : vec4<f32>,
-                color : vec4<f32>,
-                enabled : f32,
-                intensity : f32,
-                padding : vec2<f32>
-            };
-
-            struct PointLight {
-                position : vec4<f32>,
-                color : vec4<f32>,
-                kc : f32, //Constant Attenuation
-                kl : f32, //Linear Attenuation
-                kq : f32, //Quadratic Attenuation
-                range : f32,
-                enabled : f32,
-                intensity : f32,
-                padding : vec2<f32>
-            };
-
-            struct SpotLight {
-                position : vec4<f32>,
-                direction : vec4<f32>,
-                color : vec4<f32>,
-                kc : f32, //Constant Attenuation
-                kl : f32, //Linear Attenuation
-                kq : f32, //Quadratic Attenuation
-                range : f32,
-                enabled : f32,
-                spotAngle : f32,
-                spotInnerAngle : f32,
-                spotExternAngle : f32,
-                intensity : f32,
-                angleX : f32,
-                angleY : f32,
-                angleZ : f32
-            };
-
-            struct Lighting
-            {
-                ambient : vec4<f32>,
-                diffuse : vec4<f32>,
-                specular : vec4<f32>
             };
 
             @group(0) @binding(0)
@@ -107,7 +50,7 @@ class PhongShadingPipeline extends DogPipeline {
             @group(3) @binding(0)
             var<uniform> model: Model;
 
-            fn GetAttenuation(kc: f32, kl: f32, kq: f32, distance: f32) -> f32
+            /*fn GetAttenuation(kc: f32, kl: f32, kq: f32, distance: f32) -> f32
             {
                 return 1.0 / (kc + kl * distance + kq * distance * distance);
             }
@@ -148,7 +91,7 @@ class PhongShadingPipeline extends DogPipeline {
                     vec4<f32>(0.0, 0.0, 0.0, 1.0)
                 );
                 
-                var mWorldView = camera.viewMatrix * model.modelMatrix;
+                var mWorldView = camera.viewMatrix;// * model.modelMatrix;
 
                 var light = mWorldView * -dl.direction;
                 light = normalize(light);
@@ -223,19 +166,19 @@ class PhongShadingPipeline extends DogPipeline {
 
                 lighting.ambient = GetAmbientLighting(sl.color, material.ambientColor);
 
-                //normal = normalize(normal);
-                lighting.diffuse = GetDiffuseLighting(lightDirectionWV, normal, sl.color * sl.intensity, material.diffuseColor);
-                lighting.specular = GetSpecularLighting(lightDirectionWV, normal, viewDirection, sl.color, material.specularColor, material.specularPower);
+                var normaln = normal; //normalize(normal);
+                lighting.diffuse = GetDiffuseLighting(lightDirectionWV, normaln, sl.color * sl.intensity, material.diffuseColor);
+                lighting.specular = GetSpecularLighting(lightDirectionWV, normaln, viewDirection, sl.color, material.specularColor, material.specularPower);
 
                 //float spot = pow(max(dot(-light, normalize(sl.  )), 0.0f), sl.spotAngle);
                 // Spot intensity
-                /** Control del cono del spot con un solo angulo */
+                // ** Control del cono del spot con un solo angulo
                 var minCos = cos(sl.spotAngle);
                 var maxCos = (minCos + 1.0f) / 2.0f;
 
-                /** Control con dos conos, uno interno y otro externo */
-                /*float minCos = cos(sl.spotExternAngle);
-                var maxCos = cos(sl.spotInnerAngle);*/
+                // ** Control con dos conos, uno interno y otro externo 
+                //float minCos = cos(sl.spotExternAngle);
+                //var maxCos = cos(sl.spotInnerAngle);
 
                 var cosAngle = dot(spotLightDirectionWV.xyz, - lightDirectionWV);
                 var spot = smoothstep(minCos, maxCos, cosAngle);
@@ -247,7 +190,7 @@ class PhongShadingPipeline extends DogPipeline {
                 lighting.specular = lighting.specular * attenuation;
 
                 return lighting;
-            }
+            }*/
 
             @vertex
             fn vertexMain(
@@ -298,19 +241,20 @@ class PhongShadingPipeline extends DogPipeline {
                     lighting.ambient += l.ambient;
                 }
 
-                //return vec4f(directionalLight.color.rgb, 1.0);
-                //return vec4f(1.0, 0.0, 0.0, 1.0);
-                //return vec4f(material.diffuseColor.rgb, 1.0);
+                if(spotLight.enabled > 0){
+                    var l = ComputeSpotLight(spotLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz));
+                    lighting.diffuse += l.diffuse;
+                    lighting.specular += l.specular;
+                    lighting.ambient += l.ambient;
+                }
 
                 return lighting.ambient + lighting.diffuse + lighting.specular;
-                //return lighting.diffuse + lighting.specular;
-                //return vec4<f32>(normal, 1.0); //debug normal
             }
         `;
 
         let vertexLayout = { "position" : 3, "normal" : 3, "texCoord" : 2 };
 
-        var descriptor = {
+        let descriptor = {
             vertexLayout: vertexLayout,
             bindGroupLayouts: bindGroupLayouts
         };

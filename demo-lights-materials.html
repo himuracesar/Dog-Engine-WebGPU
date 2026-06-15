@@ -96,6 +96,25 @@
             kl: 0.0,
             kq: 0.0
         };
+
+        var spotLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            position: { x: 0.0, y: 50.0, z: 0.0 },
+            direction: { x: 0.0, y: -1.0, z: 0.0 },
+            enabled: true,
+            intensity: 1.0,
+            range: 1.0,
+            kc: 0.0,
+            kl: 0.0,
+            kq: 0.0,
+            spotAngle: 0.0,
+            spotInnerAngle: 0.0,
+            spotExternAngle: 0.0,
+            angleX : 0.0,
+            angleY : 0.0,
+            angleZ : 0.0
+        };
+            
     </script>
 
     <script type="module">
@@ -140,6 +159,26 @@
         pointLightFolder.addBinding(pointLightState, 'kl', { label: 'Linear Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
         pointLightFolder.addBinding(pointLightState, 'kq', { label: 'Quadratic Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
 
+        const spotLightFolder = paneLights.addFolder({
+            title: 'Spot Light',
+            expanded: false,   // optional
+        });
+
+        spotLightFolder.addBinding(spotLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'position', { vector: { type: 'float' } }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'range', { label: 'Range', min: 0, max: 10000, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kc', { label: 'Constant Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kl', { label: 'Lineal Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kq', { label: 'Quadratic Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'spotAngle', { label: 'Spot Angle', min: 0, max: 500, step: 0.1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'spotInnerAngle', { label: 'Spot Inner Angle', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleX', { label: 'Angle in X', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleY', { label: 'Angle in Y', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleZ', { label: 'Angle in Z', min: 0, max: 500, step: 1}).on('change', emitUI);
+
         // Send data to the engine
         function emitUI() {
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
@@ -160,6 +199,13 @@
         // Emit initial state
         emitUI();
     </script>
+
+    <!--script type="module">
+        import { STRUCTS_LIGHTS_AND_MATERIAL } from '/DogEngine/pipeline/structs/LightsAndMaterial.js';
+        const _STRUCTS_LIGHTS_AND_MATERIAL_ = STRUCTS_LIGHTS_AND_MATERIAL;
+    </script-->
+
+    <script type="text/javascript" src="/DogEngine/pipeline/structs/LightsAndMaterial.js"></script>
 
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
     <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
@@ -301,6 +347,7 @@
 
         function createLightsMaterials() {
             directionalLight = new DogDirectionalLight();
+            directionalLight.setEnabled(false);
 
             pointLight = new DogPointLight();
             pointLight.setColor([1.0, 1.0, 1.0, 1.0]);
@@ -311,9 +358,25 @@
             pointLight.setConstantAttenuation(0.2);
             pointLight.setQuadraticAttenuation(0.003);
             pointLight.setIntensity(10.0);
+            pointLight.setEnabled(false);
 
             spotLight = new DogSpotLight();
-            spotLight.setColor([0.0, 0.0, 1.0, 1.0]);
+            spotLight.setPosition([0.0, 70.0, 0.0]);
+            spotLight.setColor([1.0, 1.0, 1.0, 1.0]);
+            spotLight.setEnabled(true);
+            spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(25.0));
+            //spotLight.setSpotAngle(25.0);
+            //spotLight.setInnerAngle(30.0);
+            //spotLight.setExternAngle(30.0);
+            spotLight.setIntensity(1.0);
+            spotLight.setRange(200.0);
+            spotLight.setConstantAttenuation(0.125);
+            spotLight.setLinealAttenuation(1);
+            spotLight.setQuadraticAttenuation(0.0);
+            spotLight.setAngleX(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setAngleY(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setAngleZ(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setDirection([0.0, -1.0, 0.0]);
 
             material = new DogMaterial();
             material.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
@@ -344,7 +407,31 @@
             pointLightState.kl = pointLight.getLinealAttenuation();
             pointLightState.kq = pointLight.getQuadraticAttenuation();
 
-             window.dispatchEvent(new CustomEvent(EVT_INIT, { }));
+            spotLightState.color.r = spotLight.getColor()[0];
+            spotLightState.color.g = spotLight.getColor()[1];
+            spotLightState.color.b = spotLight.getColor()[2];
+            spotLightState.color.a = spotLight.getColor()[3];
+            spotLightState.position.x = spotLight.getPosition()[0];
+            spotLightState.position.y = spotLight.getPosition()[1];
+            spotLightState.position.z = spotLight.getPosition()[2];
+            spotLightState.direction.x = spotLight.getDirection()[0];
+            spotLightState.direction.y = spotLight.getDirection()[1];
+            spotLightState.direction.z = spotLight.getDirection()[2];
+            spotLightState.enabled = spotLight.isEnabled();
+            spotLightState.intensity = spotLight.getIntensity();
+            spotLightState.range = spotLight.getRange();
+            spotLightState.kc = spotLight.getConstantAttenuation();
+            spotLightState.kl = spotLight.getLinealAttenuation();
+            spotLightState.kq = spotLight.getQuadraticAttenuation();
+            spotLightState.spotAngle = glMatrix.glMatrix.toDegree(spotLight.getSpotAngle());
+            //spotLightState.spotAngle = spotLight.getSpotAngle();
+            spotLightState.spotInnerAngle = glMatrix.glMatrix.toDegree(spotLight.getInnerAngle());
+            spotLightState.spotExternAngle = glMatrix.glMatrix.toDegree(spotLight.getExternAngle());
+            spotLightState.angleX = glMatrix.glMatrix.toDegree(spotLight.getAngleX());
+            spotLightState.angleY = glMatrix.glMatrix.toDegree(spotLight.getAngleY());
+            spotLightState.angleZ = glMatrix.glMatrix.toDegree(spotLight.getAngleZ());
+
+            window.dispatchEvent(new CustomEvent(EVT_INIT, { }));
         }
 
         //------------------ End demo's main functons -----------------
@@ -493,6 +580,19 @@
             pointLight.setLinealAttenuation(pointLightState.kl);
             pointLight.setQuadraticAttenuation(pointLightState.kq);
 
+            spotLight.setPosition([spotLightState.position.x, spotLightState.position.y, spotLightState.position.z, 1.0]);
+            spotLight.setDirection([spotLightState.direction.x, spotLightState.direction.y, spotLightState.direction.z, 0.0]);
+            spotLight.setColor([spotLightState.color.r, spotLightState.color.g, spotLightState.color.b, spotLightState.color.a]);
+            spotLight.setEnabled(spotLightState.enabled);
+            spotLight.setIntensity(spotLightState.intensity);
+            spotLight.setRange(spotLightState.range);
+            spotLight.setConstantAttenuation(spotLightState.kc);
+            spotLight.setLinealAttenuation(spotLightState.kl);
+            spotLight.setQuadraticAttenuation(spotLightState.kq);
+            spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(spotLightState.spotAngle));
+            spotLight.setInnerAngle(spotLightState.spotInnerAngle);
+            spotLight.setExternAngle(spotLightState.spotExternAngle);
+
             //--------------- end update lights and materials from the UI state ---------------
 
             input();
@@ -549,7 +649,6 @@
 
             const commandBuffer = encoder.finish();
 
-
             // Finish the command buffer and immediately submit it.
             pGraphics.device.queue.submit([commandBuffer]);
             //console.log("Frame rendered");
@@ -565,6 +664,7 @@
 
             requestAnimationFrame(updateAndRender);
         }
+
     </script>
 </body>
 </html>

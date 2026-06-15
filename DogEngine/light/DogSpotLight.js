@@ -257,7 +257,7 @@ class DogSpotLight {
      * @param {float} angle Angle in radians
      */
     setInnerAngle(angle){
-        this.spotAngle = angle;
+        this.spotInnerAngle = angle;
     }
 
     /**
@@ -265,7 +265,7 @@ class DogSpotLight {
      * @param {float} angle Angle in radians
      */
     setExternAngle(angle){
-        this.spotAngle = angle;
+        this.spotExternalAngle = angle;
     }
 
     /**
@@ -302,8 +302,8 @@ class DogSpotLight {
         glMatrix.mat4.rotateY(mRot, mRot, this.angleY);
         glMatrix.mat4.rotateX(mRot, mRot, this.angleX);
         glMatrix.mat4.rotateZ(mRot, mRot, this.angleZ);
-        glMatrix.vec3.transformMat4(this.direction, this.direction);
-        vec3.transformMat4(this.direction, this.direction, transformMatrix);
+        //glMatrix.vec4.transformMat4(this.direction, this.direction);
+        glMatrix.vec4.transformMat4(this.direction, this.direction, mRot);
     }
 
      //----------------------- WebGPU's methods -----------------------
