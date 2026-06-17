@@ -259,6 +259,26 @@ class PhongShadingPipeline extends DogPipeline {
             bindGroupLayouts: bindGroupLayouts
         };
 
+        /*const commonShader = await Promise(
+            fetch('/DogEngine/pipeline/shaders|/LightsAndMaterial.wgsl').then(res => res.text())
+        );*/
+
+        /*(async () => {
+            const response = await fetch('/DogEngine/pipeline/shaders/LightsAndMaterials.wgsl');
+            const data = await response.json();
+            console.log(data);
+        })()*/
+
+        /*fetch('/DogEngine/pipeline/shaders/LightsAndMaterials.wgsl')
+        .then((res) => res.text())
+        .then((text) => {
+            // do something with "text"
+            debugger;
+        })
+        .catch((e) => console.error(e));*/
+
+        //let commonShader = webGPUengine.loadShaderFromFile('/DogEngine/pipeline/shaders/LightsAndMaterials.wgsl');
+
         super("PhongShading", shader, descriptor);
     }
 }

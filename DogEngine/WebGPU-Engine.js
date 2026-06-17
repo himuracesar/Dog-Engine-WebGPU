@@ -316,11 +316,43 @@ const GPUVisibility = Object.freeze({
             return name;
         }
 
+        /**
+         * Get the content of shader file
+         * @param {string} fileName Path and name of the file
+         * @returns {string} The content of the file
+         */
+        /*function loadShaderFromFile(fileName) {
+            var request = new XMLHttpRequest();
+            debugger;
+            request.onreadystatechange = function() {
+                debugger;
+                if (request.readyState === 4 && request.status !== 404) { 
+                    return request.responseText; 
+                }
+            }
+
+            request.open('GET', fileName, true); // Create a request to acquire the file
+            request.send();                      // Send the request
+        }*/
+
+        async function loadShaderFromFile(fileName) {
+            debugger;
+            try {
+                const response = await fetch(fileName);
+                const fileString = await response.text(); 
+                console.log(fileString);
+            } catch (error) {
+                console.error('Fetch failed:', error);
+            }
+        }
+
+
         return {
             initWebGPU : initWebGPU,
             createBindGroupLayouts : createBindGroupLayouts,
             createBindGroup : createBindGroup,
-            createDogBuffer : createDogBuffer
+            createDogBuffer : createDogBuffer,
+            loadShaderFromFile : loadShaderFromFile
         }
 
     })

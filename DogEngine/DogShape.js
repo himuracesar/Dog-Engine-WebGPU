@@ -120,7 +120,7 @@ class DogShape {
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
         if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
-            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
+            mesh.setBoundingVolume(new DogBoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
         }
 
         return staticMesh;
@@ -253,7 +253,7 @@ class DogShape {
             */
         
             // South pole vertex was added last.
-            var southPoleIndex = _vertices.length - 1;
+            var southPoleIndex = _vertices.length / 8 - 1;
         
             // Offset the _indices to the index of the first vertex in the last ring.
             baseIndex = southPoleIndex - ringVertexCount;
@@ -283,7 +283,7 @@ class DogShape {
         staticMesh.setIdIndexBuffer(idIb);
 
         if(descriptor.BoundingVolumeType === BoundingVolumeType.Sphere){
-            mesh.setDogBoundingVolume(new DogBoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
+            mesh.setBoundingVolume(new DogBoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
         } 
 
         return staticMesh;
@@ -552,7 +552,7 @@ class DogShape {
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
         if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
-            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
+            mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
         return staticMesh;
@@ -764,7 +764,7 @@ class DogShape {
         mesh.setNumIndices(numIndices);
 
         if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
-            mesh.setDogBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
+            mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
         var staticMesh = new DogStaticMesh();

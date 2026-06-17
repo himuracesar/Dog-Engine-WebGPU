@@ -71,22 +71,22 @@
 
     <script>
         // Global state for the performance monitor
-        var performanceState = {
+        let performanceState = {
             fps: 0.0
         };
         // Global state for the configuration parameters
-        var configState = {
+        let configState = {
             background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
         };
 
-        var directionalLightState = {
+        let directionalLightState = {
             color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
             direction: { x: 1.0, y: -1.0, z: -1.0 },
             enabled: true,
             intensity: 1.0
         };
 
-        var  pointLightState = {
+        let  pointLightState = {
             color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
             position: { x: 0.0, y: 50.0, z: 0.0 },
             enabled: true,
@@ -97,7 +97,7 @@
             kq: 0.0
         };
 
-        var spotLightState = {
+        let spotLightState = {
             color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
             position: { x: 0.0, y: 50.0, z: 0.0 },
             direction: { x: 0.0, y: -1.0, z: 0.0 },
@@ -218,6 +218,7 @@
     <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/GouradShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
 </head>
@@ -229,8 +230,8 @@
     <div id="ui-config" class="widget-pane"></div>
 
     <script type="text/javascript">
-        var canvas;
-        var pGraphics;
+        let canvas;
+        let pGraphics;
 
         let lastTime = 0;
 
@@ -240,41 +241,44 @@
         const EVT_INIT = 'engine-init';
         //***************************************************
         
-        var phongShadingPipeline;
-        var wireframePipeline;
+        let phongShadingPipeline;
+        let gouradShadingPipeline;
+        let wireframePipeline;
 
-        var camera;
+        let camera;
 
-        var resourceManager;
+        let resourceManager;
 
-        var sphere;
+        let spherePhong;
+        let sphereGourad;
     
-        var material = null;
-        var directionalLight = null;
-        var pointLight = null;
-        var spotLight = null;
+        let material = null;
+        let directionalLight = null;
+        let pointLight = null;
+        let spotLight = null;
 
-        var scalingFactor = 0.01;
+        let scalingFactor = 0.01;
 
-        var bindGroupLayouts;
+        let bindGroupLayouts;
 
-        var depthTexture;
+        let depthTexture;
 
-        var propsBindGroup;
-        var propsBindGroupLayout;
+        let propsBindGroup;
+        let propsBindGroupLayout;
 
         //------------------- Demo's main functions -------------------
         function createShapes(){
             const shape = new DogShape();
             
-            var descriptor = {};
+            let descriptor = {};
             descriptor.radio = 30.0;
             descriptor.slices = 25;
             descriptor.stacks = 25;
             descriptor.BoundingVolumeType = BoundingVolumeType.Sphere;
 
-            sphere = shape.createSphere(descriptor);
-
+            spherePhong = shape.createSphere(descriptor);
+            sphereGourad = shape.createSphere(descriptor);
+          
             descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
             descriptor.numVertRows = 50;
@@ -284,7 +288,8 @@
             
             grid = shape.createGrid(descriptor);
             
-            sphere.getTransform().translateAbsolute(0.0, 30.0, 0.0);
+            spherePhong.getTransform().translateAbsolute(0.0, 30.0, 0.0);
+            sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
         }
 
         function createPipeline(){
@@ -297,6 +302,7 @@
             ];
 
             phongShadingPipeline = new PhongShadingPipeline(bglPhong);
+            gouradShadingPipeline = new GouradShadingPipeline(bglPhong);
 
             const bglWireframe = [
                 resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout, 
@@ -325,8 +331,8 @@
                 }]
             });
 
-            var propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
-            var propsBuffer = pGraphics.device.createBuffer({
+            let propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
+            let propsBuffer = pGraphics.device.createBuffer({
                 size: propsData.byteLength,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
@@ -347,7 +353,7 @@
 
         function createLightsMaterials() {
             directionalLight = new DogDirectionalLight();
-            directionalLight.setEnabled(false);
+            directionalLight.setEnabled(true);
 
             pointLight = new DogPointLight();
             pointLight.setColor([1.0, 1.0, 1.0, 1.0]);
@@ -363,7 +369,7 @@
             spotLight = new DogSpotLight();
             spotLight.setPosition([0.0, 70.0, 0.0]);
             spotLight.setColor([1.0, 1.0, 1.0, 1.0]);
-            spotLight.setEnabled(true);
+            spotLight.setEnabled(false);
             spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(25.0));
             //spotLight.setSpotAngle(25.0);
             //spotLight.setInnerAngle(30.0);
@@ -455,11 +461,11 @@
             const groupLayouts = [
                 [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }], // 2 matrices: view and projection
                 [
-                    { name: "DogDirectionalLight", label: "Directional Light", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
-                    { name: "DogPointLight", label: "Point Light", group: 1, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment },
-                    { name: "DogSpotLight", label: "Spot Light", group: 1, binding: 2, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }
+                    { name: "DogDirectionalLight", label: "Directional Light", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex },
+                    { name: "DogPointLight", label: "Point Light", group: 1, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex },
+                    { name: "DogSpotLight", label: "Spot Light", group: 1, binding: 2, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex }
                 ],
-                [{ name: "DogMaterial", label: "Material", group: 2, binding: 0, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment }],
+                [{ name: "DogMaterial", label: "Material", group: 2, binding: 0, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex }],
                 [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }]
             ];
 
@@ -494,9 +500,9 @@
          */
         function onMouseDown(event) {
             this.dragging = true;
-            var x = event.clientX; // x coordinate of a mouse pointer
-            var y = event.clientY; // y coordinate of a mouse pointer
-            var rect = event.target.getBoundingClientRect();
+            let x = event.clientX; // x coordinate of a mouse pointer
+            let y = event.clientY; // y coordinate of a mouse pointer
+            let rect = event.target.getBoundingClientRect();
 
             //console.log("Mouse down at: " + x + ", " + y);
             mouse.down = true;
@@ -597,7 +603,8 @@
 
             input();
 
-            sphere.update(dt);
+            spherePhong.update(dt);
+            sphereGourad.update(dt);
             grid.update(dt);
         }
 
@@ -639,11 +646,15 @@
 
             pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
 
-            sphere.render(pass);
+            spherePhong.render(pass);
+
+            pass.setPipeline(gouradShadingPipeline.getWebGPUPipeline());
+            sphereGourad.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props
             grid.render(pass);
+            //sphereGourad.render(pass);
 
             pass.end();
 

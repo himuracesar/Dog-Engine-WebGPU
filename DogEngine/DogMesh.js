@@ -72,7 +72,7 @@ class DogMesh {
      * Get the bounding volume of the mesh.
      * @returns {DogBoundingVolume} The bounding volume of the mesh.
      */
-    getDogBoundingVolume(){
+    getBoundingVolume(){
         return this.boundingVolume;
     }
 
@@ -80,7 +80,7 @@ class DogMesh {
      * Set the bounding volume of the mesh.
      * @param {DogBoundingVolume} DogBoundingVolume - The new bounding volume of the mesh.
      */
-    setDogBoundingVolume(DogBoundingVolume){
+    setBoundingVolume(DogBoundingVolume){
         this.boundingVolume = DogBoundingVolume;
     }
 
