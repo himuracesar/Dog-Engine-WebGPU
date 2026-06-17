@@ -3,7 +3,7 @@
  * @author César Himura
  * @version 1.0
  */
-class BoundingVolume {
+class DogBoundingVolume {
 
     /**
      * Creates a new bounding volume
@@ -13,24 +13,24 @@ class BoundingVolume {
     constructor(vmin, vmax){
         this.vmin = vmin;
         this.vmax = vmax;
-        this.transform = new DogTransform();
+        this.position = [0.0, 0.0, 0.0];
         this.type = BoundingVolumeType.None;
     }
 
     /**
-     * Gets the transform of the bounding volume     
-     * @returns {DogTransform} Transform of the bounding volume
+     * Get the position of the bounding
+     * @returns {Vector3} Position of the bounding
      */
-     getTransform(){
-        return this.transform;
+    getPosition(){
+        return this.position;
     }
 
     /**
-     * Sets the transform of the bounding volume.
-     * @param {DogTransform} transform Transform to be set for the bounding volume.
+     * Set the position to the bounding
+     * @param {Vector3} position Position of the bounding
      */
-    setTransform(transform){
-        this.transform = transform;
+    setPosition(position){
+        this.position = position;
     }
 
     /**

@@ -33,9 +33,9 @@ class DogMesh {
             const rotation = this.transform.getRotation();
             const scale = this.transform.getScale();
 
-            this.boundingVolume.getTransform().translateAbsolute(position[0], position[1], position[2]);
+            /*this.boundingVolume.getTransform().translateAbsolute(position[0], position[1], position[2]);
             this.boundingVolume.getTransform().rotateAbsolute(rotation[0], rotation[1], rotation[2]);
-            this.boundingVolume.getTransform().scaleAbsolute(scale[0], scale[1], scale[2]);
+            this.boundingVolume.getTransform().scaleAbsolute(scale[0], scale[1], scale[2]);*/
         }
     }
 
@@ -45,9 +45,9 @@ class DogMesh {
      * @param {GPUEncoderPass} pass 
      */
     render(pass){
-        pGraphics.device.queue.writeBuffer(this.transform.getUniformBuffer(), 0, this.transform.getTransformMatrix());
+        pGraphics.device.queue.writeBuffer(this.transform.getBuffer().getWebGPUBuffer(), 0, this.transform.getTransformMatrix());
 
-        pass.setBindGroup(1, this.transform.getBindGroup());
+        pass.setBindGroup(this.transform.getGroup(), this.transform.getBindGroup());
          //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
         pass.drawIndexed(this.numIndices, 1, 0, 0, 0);
     }
@@ -70,7 +70,7 @@ class DogMesh {
 
     /**
      * Get the bounding volume of the mesh.
-     * @returns {BoundingVolume} The bounding volume of the mesh.
+     * @returns {DogBoundingVolume} The bounding volume of the mesh.
      */
     getBoundingVolume(){
         return this.boundingVolume;
@@ -78,10 +78,10 @@ class DogMesh {
 
     /**
      * Set the bounding volume of the mesh.
-     * @param {BoundingVolume} boundingVolume - The new bounding volume of the mesh.
+     * @param {DogBoundingVolume} DogBoundingVolume - The new bounding volume of the mesh.
      */
-    setBoundingVolume(boundingVolume){
-        this.boundingVolume = boundingVolume;
+    setBoundingVolume(DogBoundingVolume){
+        this.boundingVolume = DogBoundingVolume;
     }
 
     /**

@@ -34,7 +34,7 @@ class NormalColorPipeline extends DogPipeline {
             @group(0) @binding(0)
             var<uniform> camera: Camera;
 
-            @group(1) @binding(0)
+            @group(3) @binding(0)
             var<uniform> model: Model;
 
             @vertex

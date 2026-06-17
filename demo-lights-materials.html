@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog WebGPU - Demo Lighting & materials</title>
+
+    <style>
+        :root {
+            --tp-base-background-color: hsla(0, 0%, 10%, 0.8);
+            --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+            --tp-button-background-color: hsla(0, 0%, 80%, 1);
+            --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+            --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+            --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+            --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+            --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+            --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.3);
+        }
+
+        /*body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }*/
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            transform: translateZ(0); /* Force GPU Layer */
+        }
+        
+        /* Containers for the Widgets */
+        .widget-pane {
+            /*position: fixed;*/
+            position: absolute;
+            z-index: 10;
+            width: 260px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            /* Avoid that events affect the canvas if not necessary */
+            pointer-events: auto; 
+
+            transform: translateZ(0); /* Crea un nuevo stacking context en GPU */
+            backface-visibility: hidden;
+            perspective: 1000;
+            will-change: transform, opacity;
+        }
+
+        #ui-camera { top: 10px; right: 300px; }
+        #ui-geometry { top: 10px; right: 20px; }
+        #ui-performance { bottom: 20px; left: 10px; width: 200px; }
+        #ui-config { top: 10px; left: 10px; }
+        #ui-lights { top: 10px; right: 20px; }
+        
+        .label { position: fixed; bottom: 10px; right: 20px; color: #555; font-size: 12px; }
+    </style>
+
+    <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
+    <link rel="icon" href="/DogEngine/ico/Triangle_icon.png" type="image/png">
+
+    <script>
+        // Global state for the performance monitor
+        let performanceState = {
+            fps: 0.0
+        };
+        // Global state for the configuration parameters
+        let configState = {
+            background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+        };
+
+        let directionalLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            direction: { x: 1.0, y: -1.0, z: -1.0 },
+            enabled: true,
+            intensity: 1.0
+        };
+
+        let  pointLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            position: { x: 0.0, y: 50.0, z: 0.0 },
+            enabled: true,
+            intensity: 1.0,
+            range: 1.0,
+            kc: 0.0,
+            kl: 0.0,
+            kq: 0.0
+        };
+
+        let spotLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            position: { x: 0.0, y: 50.0, z: 0.0 },
+            direction: { x: 0.0, y: -1.0, z: 0.0 },
+            enabled: true,
+            intensity: 1.0,
+            range: 1.0,
+            kc: 0.0,
+            kl: 0.0,
+            kq: 0.0,
+            spotAngle: 0.0,
+            spotInnerAngle: 0.0,
+            spotExternAngle: 0.0,
+            angleX : 0.0,
+            angleY : 0.0,
+            angleZ : 0.0
+        };
+            
+    </script>
+
+    <script type="module">
+        import { Pane } from '/DogEngine/lib/tweakpane-4.0.5.js';
+        //import { mat4 } from 'gl-matrix';
+
+        // --- Widget 1: Performance  ---
+        const panePerformance = new Pane({ container: document.getElementById('ui-performance'), title: '📊 Performance' });
+        panePerformance.addBinding(performanceState, 'fps', { label: 'FPS', readonly: true, view: 'number' }).on('change', emitUI);
+        panePerformance.addBinding(performanceState, 'fps', { 
+            label: 'FPS Graph', readonly: true, view: 'graph', 
+            interval: 100, bufferSize: 64, min: 10, max: 200 
+        }).on('change', emitUI);
+
+        // --- Widget 2: Config  ---
+        const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
+        paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
+
+        // --- Widget 3: Lights  ---
+        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights' });
+        const directionalLightFolder = paneLights.addFolder({
+            title: 'Directional Light',
+            expanded: false,   // optional
+        });
+
+        directionalLightFolder.addBinding(directionalLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+
+        const pointLightFolder = paneLights.addFolder({
+            title: 'Point Light',
+            expanded: false,   // optional
+        });
+
+        pointLightFolder.addBinding(pointLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'position', { vector: { type: 'float' } }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'range', { label: 'Range', min: 0, max: 10000, step: 1}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kc', { label: 'Constant Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kl', { label: 'Linear Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        pointLightFolder.addBinding(pointLightState, 'kq', { label: 'Quadratic Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+
+        const spotLightFolder = paneLights.addFolder({
+            title: 'Spot Light',
+            expanded: false,   // optional
+        });
+
+        spotLightFolder.addBinding(spotLightState, 'color', { color: {type: 'float'} }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'position', { vector: { type: 'float' } }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'range', { label: 'Range', min: 0, max: 10000, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kc', { label: 'Constant Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kl', { label: 'Lineal Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'kq', { label: 'Quadratic Attenuation', min: 0, max: 1, step: 0.01}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'spotAngle', { label: 'Spot Angle', min: 0, max: 500, step: 0.1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'spotInnerAngle', { label: 'Spot Inner Angle', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleX', { label: 'Angle in X', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleY', { label: 'Angle in Y', min: 0, max: 500, step: 1}).on('change', emitUI);
+        spotLightFolder.addBinding(spotLightState, 'angleZ', { label: 'Angle in Z', min: 0, max: 500, step: 1}).on('change', emitUI);
+
+        // Send data to the engine
+        function emitUI() {
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: pointLightState }));
+        }
+
+        // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
+        setInterval(() => {
+            panePerformance.refresh();
+        }, 100);
+
+        window.addEventListener(EVT_INIT, (e) => {
+            paneLights.refresh();
+        });
+
+        // Emit initial state
+        emitUI();
+    </script>
+
+    <!--script type="module">
+        import { STRUCTS_LIGHTS_AND_MATERIAL } from '/DogEngine/pipeline/structs/LightsAndMaterial.js';
+        const _STRUCTS_LIGHTS_AND_MATERIAL_ = STRUCTS_LIGHTS_AND_MATERIAL;
+    </script-->
+
+    <script type="text/javascript" src="/DogEngine/pipeline/structs/LightsAndMaterial.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
+    <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogMaterial.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogDirectionalLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/GouradShadingPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
+</head>
+<body onload="init();">
+    <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
+
+    <!-- Containers for Tweakpane -->
+    <div id="ui-performance" class="widget-pane"></div>
+    <div id="ui-config" class="widget-pane"></div>
+
+    <script type="text/javascript">
+        let canvas;
+        let pGraphics;
+
+        let lastTime = 0;
+
+        /******* Events' names for clean communication *******/
+        const EVT_DATA = 'engine-data-update';
+        const EVT_UI = 'ui-params-change';
+        const EVT_INIT = 'engine-init';
+        //***************************************************
+        
+        let phongShadingPipeline;
+        let gouradShadingPipeline;
+        let wireframePipeline;
+
+        let camera;
+
+        let resourceManager;
+
+        let spherePhong;
+        let sphereGourad;
+    
+        let material = null;
+        let directionalLight = null;
+        let pointLight = null;
+        let spotLight = null;
+
+        let scalingFactor = 0.01;
+
+        let bindGroupLayouts;
+
+        let depthTexture;
+
+        let propsBindGroup;
+        let propsBindGroupLayout;
+
+        //------------------- Demo's main functions -------------------
+        function createShapes(){
+            const shape = new DogShape();
+            
+            let descriptor = {};
+            descriptor.radio = 30.0;
+            descriptor.slices = 25;
+            descriptor.stacks = 25;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Sphere;
+
+            spherePhong = shape.createSphere(descriptor);
+            sphereGourad = shape.createSphere(descriptor);
+          
+            descriptor = {};
+            descriptor.delta = [100.0, 0.0, 100.0];
+            descriptor.numVertRows = 50;
+            descriptor.numVertCols = 50;
+            descriptor.position = [0.0, 0.0, 0.0];
+            descriptor.texScale = 1.0;
+            
+            grid = shape.createGrid(descriptor);
+            
+            spherePhong.getTransform().translateAbsolute(0.0, 30.0, 0.0);
+            sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
+        }
+
+        function createPipeline(){
+            const bglPhong = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                //resourceManager.getConfigComponentByName("DogDirectionalLight").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogPointLight").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogMaterial").bindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout,
+            ];
+
+            phongShadingPipeline = new PhongShadingPipeline(bglPhong);
+            gouradShadingPipeline = new GouradShadingPipeline(bglPhong);
+
+            const bglWireframe = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout, 
+                undefined, // Bind group 1 is not used in this demo
+                propsBindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
+
+            wireframePipeline = new WireframePipeline(bglWireframe);
+
+            depthTexture = pGraphics.device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+        }
+
+        function createProps(){
+            propsBindGroupLayout = pGraphics.device.createBindGroupLayout({
+                entries: [{
+                    binding: 0,                           // Same index as in the bindGroup
+                    visibility: GPUShaderStage.FRAGMENT,    // In which stages is visible
+                    buffer: {
+                        type: "uniform"                     // uniform buffer (default)
+                    }
+                }]
+            });
+
+            let propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
+            let propsBuffer = pGraphics.device.createBuffer({
+                size: propsData.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+            pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
+            
+            propsBindGroup = pGraphics.device.createBindGroup({
+                layout: propsBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: propsBuffer,
+                        },
+                    },
+                ],
+            });
+        }
+
+        function createLightsMaterials() {
+            directionalLight = new DogDirectionalLight();
+            directionalLight.setEnabled(true);
+
+            pointLight = new DogPointLight();
+            pointLight.setColor([1.0, 1.0, 1.0, 1.0]);
+            pointLight.setPosition([0.0, 100.0, 0.0]);
+            pointLight.setRange(80);
+            pointLight.setColor([0.99, 0.99, 0.99, 1.0]);
+            pointLight.setLinealAttenuation(0.125);
+            pointLight.setConstantAttenuation(0.2);
+            pointLight.setQuadraticAttenuation(0.003);
+            pointLight.setIntensity(10.0);
+            pointLight.setEnabled(false);
+
+            spotLight = new DogSpotLight();
+            spotLight.setPosition([0.0, 70.0, 0.0]);
+            spotLight.setColor([1.0, 1.0, 1.0, 1.0]);
+            spotLight.setEnabled(false);
+            spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(25.0));
+            //spotLight.setSpotAngle(25.0);
+            //spotLight.setInnerAngle(30.0);
+            //spotLight.setExternAngle(30.0);
+            spotLight.setIntensity(1.0);
+            spotLight.setRange(200.0);
+            spotLight.setConstantAttenuation(0.125);
+            spotLight.setLinealAttenuation(1);
+            spotLight.setQuadraticAttenuation(0.0);
+            spotLight.setAngleX(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setAngleY(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setAngleZ(glMatrix.glMatrix.toRadian(0.0));
+            spotLight.setDirection([0.0, -1.0, 0.0]);
+
+            material = new DogMaterial();
+            material.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
+            material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
+            material.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
+
+            directionalLightState.color.r = directionalLight.getColor()[0];
+            directionalLightState.color.g = directionalLight.getColor()[1];
+            directionalLightState.color.b = directionalLight.getColor()[2];
+            directionalLightState.color.a = directionalLight.getColor()[3];
+            directionalLightState.direction.x = directionalLight.getDirection()[0];
+            directionalLightState.direction.y = directionalLight.getDirection()[1];
+            directionalLightState.direction.z = directionalLight.getDirection()[2];
+            directionalLightState.enabled = directionalLight.isEnabled();
+            directionalLightState.intensity = directionalLight.getIntensity();
+
+            pointLightState.color.r = pointLight.getColor()[0];
+            pointLightState.color.g = pointLight.getColor()[1];
+            pointLightState.color.b = pointLight.getColor()[2];
+            pointLightState.color.a = pointLight.getColor()[3];
+            pointLightState.position.x = pointLight.getPosition()[0];
+            pointLightState.position.y = pointLight.getPosition()[1];
+            pointLightState.position.z = pointLight.getPosition()[2];
+            pointLightState.enabled = pointLight.isEnabled();
+            pointLightState.intensity = pointLight.getIntensity();
+            pointLightState.range = pointLight.getRange();
+            pointLightState.kc = pointLight.getConstantAttenuation();
+            pointLightState.kl = pointLight.getLinealAttenuation();
+            pointLightState.kq = pointLight.getQuadraticAttenuation();
+
+            spotLightState.color.r = spotLight.getColor()[0];
+            spotLightState.color.g = spotLight.getColor()[1];
+            spotLightState.color.b = spotLight.getColor()[2];
+            spotLightState.color.a = spotLight.getColor()[3];
+            spotLightState.position.x = spotLight.getPosition()[0];
+            spotLightState.position.y = spotLight.getPosition()[1];
+            spotLightState.position.z = spotLight.getPosition()[2];
+            spotLightState.direction.x = spotLight.getDirection()[0];
+            spotLightState.direction.y = spotLight.getDirection()[1];
+            spotLightState.direction.z = spotLight.getDirection()[2];
+            spotLightState.enabled = spotLight.isEnabled();
+            spotLightState.intensity = spotLight.getIntensity();
+            spotLightState.range = spotLight.getRange();
+            spotLightState.kc = spotLight.getConstantAttenuation();
+            spotLightState.kl = spotLight.getLinealAttenuation();
+            spotLightState.kq = spotLight.getQuadraticAttenuation();
+            spotLightState.spotAngle = glMatrix.glMatrix.toDegree(spotLight.getSpotAngle());
+            //spotLightState.spotAngle = spotLight.getSpotAngle();
+            spotLightState.spotInnerAngle = glMatrix.glMatrix.toDegree(spotLight.getInnerAngle());
+            spotLightState.spotExternAngle = glMatrix.glMatrix.toDegree(spotLight.getExternAngle());
+            spotLightState.angleX = glMatrix.glMatrix.toDegree(spotLight.getAngleX());
+            spotLightState.angleY = glMatrix.glMatrix.toDegree(spotLight.getAngleY());
+            spotLightState.angleZ = glMatrix.glMatrix.toDegree(spotLight.getAngleZ());
+
+            window.dispatchEvent(new CustomEvent(EVT_INIT, { }));
+        }
+
+        //------------------ End demo's main functons -----------------
+
+        /**
+         * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
+         */
+        async function init(){
+            canvas = document.getElementById("WebGPUcanvas");
+
+            pGraphics = await webGPUengine.initWebGPU(canvas);
+
+            window.onkeydown = event => this.onKeyDown(event);
+            window.onkeyup = event => this.onKeyUp(event);
+            canvas.onmouseup = event => this.onMouseUp(event);
+            canvas.onmousedown = event => this.onMouseDown(event);
+            canvas.onmousemove = event => this.onMouseMove(event);
+
+            resourceManager = new DogResourceManager();
+
+            const groupLayouts = [
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }], // 2 matrices: view and projection
+                [
+                    { name: "DogDirectionalLight", label: "Directional Light", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex },
+                    { name: "DogPointLight", label: "Point Light", group: 1, binding: 1, bufferSize: 16 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex },
+                    { name: "DogSpotLight", label: "Spot Light", group: 1, binding: 2, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex }
+                ],
+                [{ name: "DogMaterial", label: "Material", group: 2, binding: 0, bufferSize: 24 * 4, visibility: GPUVisibility.Fragment | GPUVisibility.Vertex }],
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex | GPUVisibility.Fragment }]
+            ];
+
+            webGPUengine.createBindGroupLayouts(groupLayouts);
+
+            camera = new DogCamera();
+            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setSpeed(2.3);
+            camera.setFarPlane(4000.0);
+            
+            createShapes();
+            createLightsMaterials();
+            createProps();
+            createPipeline();
+            
+            requestAnimationFrame(updateAndRender);
+        }
+
+        //------------- Input -------------
+        /**
+         * Release click and stop dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseUp(event) {
+            this.dragging = false;
+            mouse.down = false;
+        }
+
+        /**
+         * Click and start dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseDown(event) {
+            this.dragging = true;
+            let x = event.clientX; // x coordinate of a mouse pointer
+            let y = event.clientY; // y coordinate of a mouse pointer
+            let rect = event.target.getBoundingClientRect();
+
+            //console.log("Mouse down at: " + x + ", " + y);
+            mouse.down = true;
+            mouse.x = x;
+            mouse.y = y;
+
+            //x = ((x - rect.left) - canvas.width / 2) / (canvas.width / 2);
+            //y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2);
+            console.log("Mouse down at: " + x + ", " + y);
+        }
+
+        /**
+         * If dragging, calculates the difference in mouse position and rotates the camera.
+         * @param {MouseEvent} event 
+         */
+        function onMouseMove(event) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+
+            this.x = event.clientX;
+            this.y = event.clientY;
+
+            mouse.x = this.x;
+            mouse.y = this.y;
+
+            if (!this.dragging) 
+                return;
+
+            const dx = this.x - this.lastX;
+            const dy = this.y - this.lastY;
+
+            camera.yaw(dx * camera.getSpeedRotation());
+            camera.pitch(dy * camera.getSpeedRotation());
+        }
+
+        /**
+         * Handles input events.
+         */
+        function input(){
+            if(keypress[KeyCode.W])
+                camera.moveForward(1);
+            if(keypress[KeyCode.S])
+                camera.moveForward(-1);
+            if(keypress[KeyCode.A])
+                camera.strafe(-1);
+            if(keypress[KeyCode.D])
+                camera.strafe(1);
+            if(keypress[KeyCode.Left])
+                camera.yaw(0.01);
+            if(keypress[KeyCode.Right])
+                camera.yaw(-0.01);
+            if(keypress[KeyCode.Up])
+                camera.pitch(0.01);
+            if(keypress[KeyCode.Down])
+                camera.pitch(-0.01);
+        }
+
+        //------------- End Input -------------
+        /**
+         * Updates the performance state and handles input.
+         * @param {float} time - The current time in milliseconds.
+         */
+        function update(time){
+            const dt = (time - lastTime);
+            lastTime = time;
+            
+            performanceState.fps = 1000 / dt;
+
+            //--------------- update lights and materials from the UI state ---------------
+            directionalLight.setDirection([directionalLightState.direction.x, directionalLightState.direction.y, directionalLightState.direction.z, 0.0]);
+            directionalLight.setColor([directionalLightState.color.r, directionalLightState.color.g, directionalLightState.color.b, directionalLightState.color.a]);
+            directionalLight.setEnabled(directionalLightState.enabled);
+            directionalLight.setIntensity(directionalLightState.intensity);
+
+            pointLight.setPosition([pointLightState.position.x, pointLightState.position.y, pointLightState.position.z, 1.0]);
+            pointLight.setColor([pointLightState.color.r, pointLightState.color.g, pointLightState.color.b, pointLightState.color.a]);
+            pointLight.setEnabled(pointLightState.enabled);
+            pointLight.setIntensity(pointLightState.intensity);
+            pointLight.setRange(pointLightState.range);
+            pointLight.setConstantAttenuation(pointLightState.kc);
+            pointLight.setLinealAttenuation(pointLightState.kl);
+            pointLight.setQuadraticAttenuation(pointLightState.kq);
+
+            spotLight.setPosition([spotLightState.position.x, spotLightState.position.y, spotLightState.position.z, 1.0]);
+            spotLight.setDirection([spotLightState.direction.x, spotLightState.direction.y, spotLightState.direction.z, 0.0]);
+            spotLight.setColor([spotLightState.color.r, spotLightState.color.g, spotLightState.color.b, spotLightState.color.a]);
+            spotLight.setEnabled(spotLightState.enabled);
+            spotLight.setIntensity(spotLightState.intensity);
+            spotLight.setRange(spotLightState.range);
+            spotLight.setConstantAttenuation(spotLightState.kc);
+            spotLight.setLinealAttenuation(spotLightState.kl);
+            spotLight.setQuadraticAttenuation(spotLightState.kq);
+            spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(spotLightState.spotAngle));
+            spotLight.setInnerAngle(spotLightState.spotInnerAngle);
+            spotLight.setExternAngle(spotLightState.spotExternAngle);
+
+            //--------------- end update lights and materials from the UI state ---------------
+
+            input();
+
+            spherePhong.update(dt);
+            sphereGourad.update(dt);
+            grid.update(dt);
+        }
+
+        /**
+         * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
+         */
+        function render(){
+            // Rendering logic goes here (e.g., issuing draw calls)
+            const encoder = pGraphics.device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                    view: pGraphics.context.getCurrentTexture().createView(),
+                    loadOp: "clear",
+                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
+                    storeOp: "store",
+                }],
+                
+                depthStencilAttachment: {
+                    view: depthTexture.createView(),
+                    depthClearValue: 1.0, // 1.0 is the farthest point
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                }
+            });
+
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            pGraphics.device.queue.writeBuffer(material.getBuffer().getWebGPUBuffer(), 0, material.getData());
+            pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
+            pGraphics.device.queue.writeBuffer(pointLight.getBuffer().getWebGPUBuffer(), 0, pointLight.getData());
+            pGraphics.device.queue.writeBuffer(spotLight.getBuffer().getWebGPUBuffer(), 0, spotLight.getData());
+
+            //pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
+            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
+            //pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
+            pass.setBindGroup(pointLight.getGroup(), pointLight.getBindGroup());
+            pass.setBindGroup(material.getGroup(), material.getBindGroup());
+
+            pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
+
+            spherePhong.render(pass);
+
+            pass.setPipeline(gouradShadingPipeline.getWebGPUPipeline());
+            sphereGourad.render(pass);
+
+            pass.setPipeline(wireframePipeline.getWebGPUPipeline());
+            pass.setBindGroup(2, propsBindGroup); // Bind group para Props
+            grid.render(pass);
+            //sphereGourad.render(pass);
+
+            pass.end();
+
+            const commandBuffer = encoder.finish();
+
+            // Finish the command buffer and immediately submit it.
+            pGraphics.device.queue.submit([commandBuffer]);
+            //console.log("Frame rendered");
+        }
+
+        /**
+         * Combines the update and render functions into a single loop that runs on each animation frame.
+         * @param {float} currentTime - The current time in milliseconds.
+         */
+        function updateAndRender(currentTime){
+            update(currentTime);
+            render();
+
+            requestAnimationFrame(updateAndRender);
+        }
+
+    </script>
+</body>
+</html>

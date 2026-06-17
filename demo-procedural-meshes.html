@@ -155,6 +155,8 @@
 
         var scalingFactor = 0.01;
 
+        var bindGroupLayouts;
+
         var depthTexture;
 
         var propsBindGroup;
@@ -168,7 +170,7 @@
             descriptor.width = 50.0;
             descriptor.height = 50.0;
             descriptor.depth = 50.0;
-            descriptor.boundingVolumeType = BoundingVolumeType.Box;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
 
             cube = shape.createCube(descriptor);
 
@@ -176,7 +178,7 @@
             descriptor.radio = 25.0;
             descriptor.slices = 20;
             descriptor.stacks = 20;
-            descriptor.boundingVolumeType = BoundingVolumeType.Sphere;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Sphere;
 
             sphere = shape.createSphere(descriptor);
 
@@ -195,7 +197,7 @@
             descriptor.bottomRadio = 20.0;
             descriptor.topRadio = 20.0;
             descriptor.height = 100.0;
-            descriptor.boundingVolumeType = BoundingVolumeType.Box;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
 
             cylinder = shape.createCylinder(descriptor);
 
@@ -204,7 +206,7 @@
             descriptor.tuberadio = 10.0;
             descriptor.radialSegments = 32;
             descriptor.tubularSegments = 16;
-            descriptor.boundingVolumeType = BoundingVolumeType.Box;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
 
             torus = shape.createTorus(descriptor);
 
@@ -222,14 +224,23 @@
         }
 
         function createPipeline(){
-            var bindGroupLayouts = [];
-            bindGroupLayouts.push(camera.getBindGroupLayout());
-            bindGroupLayouts.push(cube.getTransform().getBindGroupLayout());
+            var bgl = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                undefined, // Bind group 1 is not used in this demo
+                undefined, // Bind group 2 is set dynamically during rendering
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
+            
+            normalColorPipeline = new NormalColorPipeline(bgl);
 
-            normalColorPipeline = new NormalColorPipeline(bindGroupLayouts);
-
-            bindGroupLayouts.push(propsBindGroupLayout);
-            wireframePipeline = new WireframePipeline(bindGroupLayouts);
+            bgl = [
+                resourceManager.getConfigComponentByName("DogCamera").bindGroupLayout,
+                undefined, // Bind group 1 is not used in this demo
+                propsBindGroupLayout,
+                resourceManager.getConfigComponentByName("DogTransform").bindGroupLayout
+            ];
+            
+            wireframePipeline = new WireframePipeline(bgl);
 
             depthTexture = pGraphics.device.createTexture({
                 size: [canvas.width, canvas.height],
@@ -254,6 +265,7 @@
                 size: propsData.byteLength,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
+
             pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
             
             propsBindGroup = pGraphics.device.createBindGroup({
@@ -287,13 +299,20 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            camera = new DogCamera();
-            camera.setPosition([0.0, 0.0, 100.0]);
-            camera.setSpeed(1.3);
-            camera.setFarPlane(4000.0);
-
             resourceManager = new DogResourceManager();
 
+            const groupLayouts = [
+                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
+                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
+            ];
+
+            webGPUengine.createBindGroupLayouts(groupLayouts);
+
+            camera = new DogCamera();
+            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setSpeed(2.3);
+            camera.setFarPlane(4000.0);
+            
             createShapes();
             createProps();
             createPipeline();
@@ -431,11 +450,14 @@
                 }
             });
 
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            /*pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 16 * 4, camera.getProjectionMatrix());*/
 
             pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
-            pass.setBindGroup(0, camera.getBindGroup());
+            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
             pass.setBindGroup(2, null);
 
             cube.render(pass);

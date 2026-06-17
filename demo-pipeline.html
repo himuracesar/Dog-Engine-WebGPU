@@ -137,6 +137,8 @@
         
         var angle = 0.0;
 
+        var resourceManager;
+
         var vertexBuffer;
         var indexBuffer;
 
@@ -241,7 +243,7 @@
                 layout: colorPipeline.getWebGPUPipeline().getBindGroupLayout(0),
                 entries: [{
                     binding: 0,
-                    resource: { buffer: camera.getUniformBuffer() }
+                    resource: { buffer: camera.getBuffer().getWebGPUBuffer() }
                 }],
             });
 
@@ -280,12 +282,14 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
+            resourceManager = new DogResourceManager();
+
+            webGPUengine.createBindGroupLayouts();
+
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);
             camera.setSpeed(0.2);
             camera.setFarPlane(4000.0);
-
-            
 
             createShapes();
             createPipeline();
@@ -411,8 +415,8 @@
                 }
             });
 
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getUniformBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
             pGraphics.device.queue.writeBuffer(modelBuffer, 0, modelMatrix);
 
             pass.setPipeline(colorPipeline.getWebGPUPipeline());
@@ -425,7 +429,6 @@
             pass.end();
 
             const commandBuffer = encoder.finish();
-
 
             // Finish the command buffer and immediately submit it.
             pGraphics.device.queue.submit([commandBuffer]);
