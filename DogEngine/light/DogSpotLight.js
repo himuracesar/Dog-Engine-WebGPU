@@ -7,7 +7,7 @@ class DogSpotLight {
     /**
      * Create an instance of spot light.
      */
-    constructor() {
+    constructor(createBuffer = true, createBindGroup = true) {
         this.position = [0.0, 0.0, 0.0];
         this.direction = [0.0, -1.0, 0.0, 0.0];
         this.color = [1.0, 1.0, 1.0, 1.0];
@@ -16,15 +16,45 @@ class DogSpotLight {
         this.kl = 0.0;
         this.kq = 0.0;
         this.spotAngle;
-		this.spotInnerAngle;
-		this.spotExternAngle;
-		this.angleX = 0.0;
-		this.angleY = 0.0;
-		this.angleZ = 0.0;
+        this.spotInnerAngle;
+        this.spotExternAngle;
+        this.angleX = 0.0;
+        this.angleY = 0.0;
+        this.angleZ = 0.0;
         this.intensity = 1.0;
         this.enabled = true;
 
-        var idCount = -1;
+        let idCount = -1;
+
+        if (createBuffer) {
+            idCount = resourceManager.getCounter();
+            const bufferSize = 24 * 4;
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight" + idCount, BufferType.Data, null, bufferSize, true);
+        }
+
+        const jsonObj = resourceManager.getGroupAndBinding("DogSpotLight");
+        this.group = jsonObj.group;
+        this.binding = jsonObj.binding;
+
+        if (createBindGroup) {
+            const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
+
+            const objLayout = {
+                label: "Point Light Bind Group",
+                layout: bindGroupLayout,
+                entries: [{
+                    binding: this.binding,
+                    resource: { buffer: resourceManager.get(this.idBuffer).getWebGPUBuffer() }
+                }],
+            };
+
+            idCount = (idCount == -1) ? resourceManager.getCounter() : idCount;
+
+            this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
+        }
+
+        /*var idCount = -1;
 
         try {
             const jsonObject = resourceManager.getConfigComponentByName("DogSpotLight");
@@ -49,14 +79,14 @@ class DogSpotLight {
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
-        }
+        }*/
     }
 
     /**
      * Get the color of the light
      * @returns {Vector4} Color of the light
      */
-    getColor(){
+    getColor() {
         return this.color;
     }
 
@@ -64,7 +94,7 @@ class DogSpotLight {
      * Get the direction of the light
      * @returns {Vector3} the direction of the light
      */
-    getDirection(){
+    getDirection() {
         return this.direction;
     }
 
@@ -72,7 +102,7 @@ class DogSpotLight {
      * Get the position of the light
      * @returns {Vector3} the position of the light
      */
-    getPosition(){
+    getPosition() {
         return this.position;
     }
 
@@ -80,7 +110,7 @@ class DogSpotLight {
      * Get if the light is on or off
      * @returns {boolean} On of off light
      */
-    isEnabled(){
+    isEnabled() {
         return this.enabled;
     }
 
@@ -88,7 +118,7 @@ class DogSpotLight {
      * Get the intensity of the light
      * @returns {float} The intensity of the light
      */
-    getIntensity(){
+    getIntensity() {
         return this.intensity;
     }
 
@@ -96,7 +126,7 @@ class DogSpotLight {
      * Set the color of the light
      * @param {Vector4} color Color of the light
      */
-    setColor(color){
+    setColor(color) {
         this.color = color;
     }
 
@@ -104,7 +134,7 @@ class DogSpotLight {
      * Set the position of the light
      * @param {Vector3} position Position of the light
      */
-    setPosition(position){
+    setPosition(position) {
         this.position = position;
     }
 
@@ -112,7 +142,7 @@ class DogSpotLight {
      * Set the direction of the light
      * @param {Vector3} direction Direction of the light
      */
-    setDirection(direction){
+    setDirection(direction) {
         this.direction = direction;
     }
 
@@ -120,7 +150,7 @@ class DogSpotLight {
      * Turn on or off the light
      * @param {boolean} enabled True or false to turn on of off the light
      */
-    setEnabled(enabled){
+    setEnabled(enabled) {
         this.enabled = enabled;
     }
 
@@ -128,7 +158,7 @@ class DogSpotLight {
      * Set the intensity of the light
      * @param {float} intensity Intensity of the light
      */
-    setIntensity(intensity){
+    setIntensity(intensity) {
         this.intensity = intensity;
     }
 
@@ -136,7 +166,7 @@ class DogSpotLight {
      * Get the constant attenuation
      * @returns {float} Constant attenuation
      */
-    getConstantAttenuation(){
+    getConstantAttenuation() {
         return this.kc;
     }
 
@@ -144,7 +174,7 @@ class DogSpotLight {
      * Get the lineal attenuation
      * @returns {float} Lineal attenuation
      */
-    getLinealAttenuation(){
+    getLinealAttenuation() {
         return this.kl;
     }
 
@@ -152,7 +182,7 @@ class DogSpotLight {
      * Get the quadratic attenuation
      * @returns {float} Quadratic attenuation
      */
-    getQuadraticAttenuation(){
+    getQuadraticAttenuation() {
         return this.kq;
     }
 
@@ -160,7 +190,7 @@ class DogSpotLight {
      * Set the constant attenuation
      * @param {float} kc 
      */
-    setConstantAttenuation(kc){
+    setConstantAttenuation(kc) {
         this.kc = kc;
     }
 
@@ -168,7 +198,7 @@ class DogSpotLight {
      * Set the lineal attenuation
      * @param {float} kl 
      */
-    setLinealAttenuation(kl){
+    setLinealAttenuation(kl) {
         this.kl = kl;
     }
 
@@ -176,7 +206,7 @@ class DogSpotLight {
      * Set the quadratic attenuation
      * @param {float} kq 
      */
-    setQuadraticAttenuation(kq){
+    setQuadraticAttenuation(kq) {
         this.kq = kq;
     }
 
@@ -184,7 +214,7 @@ class DogSpotLight {
      * Get the range
      * @returns {float} range
      */
-    getRange(){
+    getRange() {
         return this.range;
     }
 
@@ -192,7 +222,7 @@ class DogSpotLight {
      * Set the range
      * @param {float} range 
      */
-    setRange(range){
+    setRange(range) {
         this.range = range;
     }
 
@@ -200,7 +230,7 @@ class DogSpotLight {
      * Get Spot angle
      * @returns {float} Spot angle
      */
-    getSpotAngle(){
+    getSpotAngle() {
         return this.spotAngle;
     }
 
@@ -208,7 +238,7 @@ class DogSpotLight {
      * Get inner angle
      * @returns {float} Inner angle
      */
-    getInnerAngle(){
+    getInnerAngle() {
         return this.spotInnerAngle;
     }
 
@@ -216,7 +246,7 @@ class DogSpotLight {
      * Get extern angle
      * @returns {float} Spot angle
      */
-    getExternAngle(){
+    getExternAngle() {
         return this.spotExternAngle;
     }
 
@@ -224,7 +254,7 @@ class DogSpotLight {
      * Get Angle in X axis
      * @returns {float} Angle in X axis
      */
-    getAngleX(){
+    getAngleX() {
         return this.angleX;
     }
 
@@ -232,7 +262,7 @@ class DogSpotLight {
      * Get Angle in Y axis
      * @returns {float} Angle in YS axis
      */
-    getAngleY(){
+    getAngleY() {
         return this.angleY;
     }
 
@@ -240,7 +270,7 @@ class DogSpotLight {
      * Get Angle in Z axis
      * @returns {float} Angle in Z axis
      */
-    getAngleZ(){
+    getAngleZ() {
         return this.angleZ;
     }
 
@@ -248,7 +278,7 @@ class DogSpotLight {
      * Set the spot angle
      * @param {float} angle Angle in radians
      */
-    setSpotAngle(angle){
+    setSpotAngle(angle) {
         this.spotAngle = angle;
     }
 
@@ -256,7 +286,7 @@ class DogSpotLight {
      * Set the inner angle
      * @param {float} angle Angle in radians
      */
-    setInnerAngle(angle){
+    setInnerAngle(angle) {
         this.spotInnerAngle = angle;
     }
 
@@ -264,7 +294,7 @@ class DogSpotLight {
      * Set the extern angle
      * @param {float} angle Angle in radians
      */
-    setExternAngle(angle){
+    setExternAngle(angle) {
         this.spotExternalAngle = angle;
     }
 
@@ -272,7 +302,7 @@ class DogSpotLight {
      * Set the angle in X axis
      * @param {float} angle Angle in radians
      */
-    setAngleX(angle){
+    setAngleX(angle) {
         this.angleX = angle;
         this.rotate();
     }
@@ -281,7 +311,7 @@ class DogSpotLight {
      * Set the angle in Y axis
      * @param {float} angle Angle in radians
      */
-    setAngleY(angle){
+    setAngleY(angle) {
         this.angleY = angle;
         this.hasChange = true;
         this.rotate();
@@ -291,7 +321,7 @@ class DogSpotLight {
      * Set the angle in Z axis
      * @param {float} angle Angle in radians
      */
-    setAngleZ(angle){
+    setAngleZ(angle) {
         this.angleZ = angle;
         this.rotate();
     }
@@ -306,21 +336,21 @@ class DogSpotLight {
         glMatrix.vec4.transformMat4(this.direction, this.direction, mRot);
     }
 
-     //----------------------- WebGPU's methods -----------------------
+    //----------------------- WebGPU's methods -----------------------
 
     /**
      * Get the bind group for the spot light.
      * @returns {GPUBindGroup} Bind group for the spot light.
      */
-    getBindGroup(){
-        return this.bindGroup;
+    getBindGroup() {
+        return resourceManager.getBindGroup(this.idBindGroup);
     }
 
     /**
      * Get the buffer of the spot light.
      * @returns {GPUBuffer} Buffer of the spot light.
      */
-    getBuffer(){
+    getBuffer() {
         return resourceManager.get(this.idBuffer);
     }
 
@@ -328,10 +358,26 @@ class DogSpotLight {
      * Gets the group to belong this component in the shaders.
      * @returns {int} group Group
      */
-    getGroup(){
+    getGroup() {
         return this.group;
     }
-    
+
+    /**
+     * Get the binding to belong this component in the shaders.
+     * @returns {int} binding Binding
+     */
+    getBinding() {
+        return this.binding;
+    }
+
+    /**
+     * Set the ID of the bind group.
+     * @param {int} idBindGroup ID of the bind group.
+     */
+    setIdBindGroup(idBindGroup) {
+        this.idBindGroup = idBindGroup;
+    }
+
     /**
      * Get the data of the spot light in an array of float32. The spread (...) is necessary to
      * flat the data correctly in float.

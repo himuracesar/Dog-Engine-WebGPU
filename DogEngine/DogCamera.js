@@ -12,7 +12,7 @@ class DogCamera {
      * The camera also creates a uniform buffer to store the view and projection matrices, a bind group layout and a bind group 
      * to bind the uniform buffer to the shader.
      */
-    constructor(){
+    constructor(createBuffer = true, createBindGroup = true) {
         this.position = [0.0, 0.0, 0.0];
         this.up = [0.0, 1.0, 0.0, 0.0];
         this.lookAt = [0.0, 0.0, 0.0];
@@ -27,16 +27,48 @@ class DogCamera {
         this.speed = 0.1;
         this.speedRotation = 0.005;
         this.velocity = [0.0, 0.0, 0.0];
+        this.idBuffer = -1;
+        this.group = -1;
+        this.binding = -1;
+        this.idBindGroup = -1;
 
-        var idCount = -1;
+        let idCount = -1;
 
-        try{
+        if (createBuffer) {
+            idCount = resourceManager.getCounter();
+            const bufferSize = 16 * 4 * 2;
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, bufferSize, true);
+        }
+
+        if (createBindGroup) {
+            const jsonObj = resourceManager.getGroupAndBinding("DogCamera");
+            this.group = jsonObj.group;
+            this.binding = jsonObj.binding;
+
+            const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
+
+            const objLayout = {
+                label: "Camera Bind Group",
+                layout: bindGroupLayout,
+                entries: [{
+                    binding: this.binding,
+                    resource: { buffer: resourceManager.get(this.idBuffer).getWebGPUBuffer() }
+                }],
+            };
+
+            idCount = (idCount == -1) ? resourceManager.getCounter() : idCount;
+
+            this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
+        }
+
+        /*try {
             const jsonCamera = resourceManager.getConfigComponentByName("DogCamera");
-            
+
             this.group = jsonCamera.group;
             this.binding = jsonCamera.binding;
 
-            if(jsonCamera.idBuffer == -1) {
+            if (jsonCamera.idBuffer == -1) {
                 idCount = resourceManager.getCounter();
                 this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, jsonCamera.bufferSize, true);
                 this.bindGroup = webGPUengine.createBindGroup("DogCamera", jsonCamera.binding, jsonCamera.bindGroupLayout, resourceManager.get(this.idBuffer));
@@ -44,23 +76,23 @@ class DogCamera {
                 this.idBuffer = jsonCamera.idBuffer;
                 this.bindGroup = jsonCamera.bindGroup;
             }
-        } catch(error) {
+        } catch (error) {
             console.log("The bind group layouts are automatically created" + error);
 
             const bufferSize = 16 * 4 * 2;
 
             this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, bufferSize, true);
-            this.bindGroup = null; 
+            this.bindGroup = null;
             this.group = -1;
             this.binding = -1;
-        }
+        }*/
     }
 
     /**
      * Create the projection matrix
      * @returns {Matrix4} Projection Matrix
      */
-    getProjectionMatrix(){
+    getProjectionMatrix() {
         var projectionMatrix = glMatrix.mat4.create();
         glMatrix.mat4.perspective(projectionMatrix, this.fov, this.aspectRatio, this.nearPlane, this.farPlane);
 
@@ -71,7 +103,7 @@ class DogCamera {
      * Compute the view matrix o view space. This space is the camera space
      * @returns {Matrix4} View Matrix or Camera Matrix.
      */
-    getViewMatrix(){
+    getViewMatrix() {
         this.position[0] += this.velocity[0];
         this.position[1] += this.velocity[1];
         this.position[2] += this.velocity[2];
@@ -98,7 +130,7 @@ class DogCamera {
 
         var mInverse = glMatrix.mat4.create();
         glMatrix.mat4.invert(mInverse, mView);
-        
+
         return mInverse;
     }
 
@@ -106,7 +138,7 @@ class DogCamera {
      * Get the near plane
      * @returns {float} near plane
      */
-    getNearPlane(){
+    getNearPlane() {
         return this.nearPlane;
     }
 
@@ -114,15 +146,15 @@ class DogCamera {
      * Get the far plane
      * @returns {float} far plane
      */
-    getFarPlane(){
+    getFarPlane() {
         return this.farPlane;
     }
-    
+
     /**
      * Get the position
      * @returns {Vector3} position
      */
-    getPosition(){
+    getPosition() {
         return this.position;
     }
 
@@ -130,7 +162,7 @@ class DogCamera {
      * Set the position
      * @param {Vector3} position 
      */
-    setPosition(position){
+    setPosition(position) {
         this.position = position;
     }
 
@@ -138,7 +170,7 @@ class DogCamera {
      * Set the look at. It's the target where the camera sees
      * @param {Vector4} look 
      */
-    setLookAt(look){
+    setLookAt(look) {
         this.lookAt = look;
     }
 
@@ -146,7 +178,7 @@ class DogCamera {
      * Get the speed of the camera to move
      * @returns {float} speed
      */
-    getSpeed(){
+    getSpeed() {
         return this.speed;
     }
 
@@ -154,7 +186,7 @@ class DogCamera {
      * Set the speed of the camera to move
      * @param {float} speed Speed
      */
-    setSpeed(speed){
+    setSpeed(speed) {
         this.speed = speed;
     }
 
@@ -162,7 +194,7 @@ class DogCamera {
      * Angle for the field of view
      * @param {float} fov Angle in degrees
      */
-    setFieldOfView(fov){
+    setFieldOfView(fov) {
         this.fov = webGLengine.degreeToRadian(fov);
     }
 
@@ -170,7 +202,7 @@ class DogCamera {
      * Set the aspect ratio
      * @param {float} aspect It's width/height
      */
-    setAspectRatio(aspect){
+    setAspectRatio(aspect) {
         this.aspectRatio = aspect;
     }
 
@@ -178,7 +210,7 @@ class DogCamera {
      * Set the near plane
      * @param {float} near Near plane
      */
-    setNearPlane(near){
+    setNearPlane(near) {
         this.nearPlane = near;
     }
 
@@ -186,7 +218,7 @@ class DogCamera {
      * Set the far plane
      * @param {float} far Far plane
      */
-    setFarPlane(far){
+    setFarPlane(far) {
         this.farPlane = far;
     }
 
@@ -194,7 +226,7 @@ class DogCamera {
      * Set the speed rotation
      * @param {float} v Velocity of speed
      */
-    setSpeedRotation(v){
+    setSpeedRotation(v) {
         this.speedRotation = v;
     }
 
@@ -202,7 +234,7 @@ class DogCamera {
      * Get the speed rotation of the camera
      * @returns the speed rotation
      */
-    getSpeedRotation(){
+    getSpeedRotation() {
         return this.speedRotation;
     }
 
@@ -210,7 +242,7 @@ class DogCamera {
      * Move units to forward with the speed of the camera
      * @param {float} units Unito to move 
      */
-    moveForward(units){
+    moveForward(units) {
         this.velocity[0] += this.forward[0] * this.speed * units;
         this.velocity[1] += this.forward[1] * this.speed * units;
         this.velocity[2] += this.forward[2] * this.speed * units;
@@ -220,7 +252,7 @@ class DogCamera {
      * Move the camera units sideways
      * @param {float} units Units to move
      */
-    strafe(units){
+    strafe(units) {
         this.velocity[0] += this.right[0] * this.speed * units;
         this.velocity[1] += this.right[1] * this.speed * units;
         this.velocity[2] += this.right[2] * this.speed * units;
@@ -230,7 +262,7 @@ class DogCamera {
      * Move to up or down
      * @param {float} units Units to move
      */
-    moveUp(units){
+    moveUp(units) {
         this.velocity[1] += units * this.speed;
     }
 
@@ -238,7 +270,7 @@ class DogCamera {
      * Rotate in yaw
      * @param {float} units Units to rotate
      */
-    yaw(units){
+    yaw(units) {
         this.yawAngle += units;
     }
 
@@ -246,7 +278,7 @@ class DogCamera {
      * Rotate in pitch
      * @param {float} units Units to rotate
      */
-    pitch(units){
+    pitch(units) {
         this.pitchAngle += units;
     }
 
@@ -306,15 +338,15 @@ class DogCamera {
      * Get the bind group for the camera.
      * @returns {GPUBindGroup} Bind group for the camera.
      */
-    getBindGroup(){
-        return this.bindGroup;
+    getBindGroup() {
+        return resourceManager.getBindGroup(this.idBindGroup);
     }
 
     /**
      * Get the uniform buffer of the camera.
      * @returns {GPUBuffer} Uniform buffer of the camera.
      */
-    getBuffer(){
+    getBuffer() {
         return resourceManager.get(this.idBuffer);
     }
 
@@ -322,7 +354,7 @@ class DogCamera {
      * Get the bind group layout of the camera.
      * @returns {GPUBindGroupLayout} Bind group layout of the camera.
      */
-    getBindGroupLayout(){
+    getBindGroupLayout() {
         return this.bindGroupLayout;
     }
 
@@ -330,7 +362,7 @@ class DogCamera {
      * Gets the group belong the camera in the shaders.
      * @returns {int} group Group of the camera.
      */
-    getGroup(){
+    getGroup() {
         return this.group;
     }
 
@@ -338,7 +370,7 @@ class DogCamera {
      * Gets the binding belong the camera in the shaders.
      * @returns {int} binding Binding of the camera.
      */
-    getBinding(){
+    getBinding() {
         return this.binding;
     }
 }

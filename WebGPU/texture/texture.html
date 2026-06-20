@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dog WebGPU - Demo Lighting & materials</title>
+    <title>Dog WebGPU - Texture</title>
 
     <style>
         :root {
@@ -213,7 +213,6 @@
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
-            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: pointLightState }));
         }
 
         // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
@@ -229,11 +228,6 @@
         emitUI();
     </script>
 
-    <!--script type="module">
-        import { STRUCTS_LIGHTS_AND_MATERIAL } from '/DogEngine/pipeline/structs/LightsAndMaterial.js';
-        const _STRUCTS_LIGHTS_AND_MATERIAL_ = STRUCTS_LIGHTS_AND_MATERIAL;
-    </script-->
-
     <script type="text/javascript" src="/DogEngine/pipeline/structs/LightsAndMaterial.js"></script>
 
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
@@ -247,9 +241,10 @@
     <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
-    <script type="text/javascript" src="/DogEngine/pipeline/GouradShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
+
+    <script type="text/javascript" src="configScene.js"></script>
 </head>
 
 <body onload="init();">
@@ -272,20 +267,16 @@
         //***************************************************
 
         let phongShadingPipeline;
-        let gouradShadingPipeline;
         let wireframePipeline;
 
         let camera;
 
-        let spherePhong;
-        let sphereGourad;
+        //let resourceManager;
+
+        let cube;
 
         let material = null;
         let directionalLight = null;
-        let pointLight = null;
-        let spotLight = null;
-
-        let scalingFactor = 0.01;
 
         let bindGroupLayouts;
 
@@ -294,18 +285,19 @@
         let propsBindGroup;
         let propsBindGroupLayout;
 
+        let angleRot;
+
         //------------------- Demo's main functions -------------------
         function createShapes() {
             const shape = new DogShape();
 
-            let descriptor = {};
-            descriptor.radio = 30.0;
-            descriptor.slices = 25;
-            descriptor.stacks = 25;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Sphere;
+            var descriptor = {};
+            descriptor.width = 50.0;
+            descriptor.height = 50.0;
+            descriptor.depth = 50.0;
+            //descriptor.BoundingVolumeType = BoundingVolumeType.Box;
 
-            spherePhong = shape.createSphere(descriptor);
-            sphereGourad = shape.createSphere(descriptor);
+            cube = shape.createCube(descriptor);
 
             descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
@@ -316,8 +308,7 @@
 
             grid = shape.createGrid(descriptor);
 
-            spherePhong.getTransform().translateAbsolute(0.0, 30.0, 0.0);
-            sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
+            cube.getTransform().translateAbsolute(0.0, 30.0, 0.0);
         }
 
         function createPipeline() {
@@ -329,7 +320,6 @@
             ];
 
             phongShadingPipeline = new PhongShadingPipeline(bglPhong);
-            gouradShadingPipeline = new GouradShadingPipeline(bglPhong);
 
             const bglWireframe = [
                 resourceManager.getBindGroupLayout(0),
@@ -412,7 +402,8 @@
             spotLight.setDirection([0.0, -1.0, 0.0]);
 
             material = new DogMaterial();
-            material.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
+            material.setDiffuseColor([0.8, 0.8, 0.8, 1.0]);
+            material.setSpecularColor([1.0, 1.0]);
             material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
             material.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
 
@@ -506,22 +497,48 @@
                         resource: { buffer: directionalLight.getBuffer().getWebGPUBuffer() }
                     },
                     {
-                        binding: 1,
+                        binding: pointLight.getBinding(),
                         resource: { buffer: pointLight.getBuffer().getWebGPUBuffer() }
                     },
                     {
-                        binding: 2,
+                        binding: spotLight.getBinding(),
                         resource: { buffer: spotLight.getBuffer().getWebGPUBuffer() }
                     }
                 ]
             };
 
             let idBindGroupLighting = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonLighting);
+            console.log("idBindGroupLighting: ", idBindGroupLighting);
 
             directionalLight.setIdBindGroup(idBindGroupLighting);
             pointLight.setIdBindGroup(idBindGroupLighting);
             spotLight.setIdBindGroup(idBindGroupLighting);
 
+            angleRot = 0.0;
+
+            //------------------------------ Texture -------------------------------------
+            const response = await fetch('/images/DogPrint02.png');
+            const imageBitmap = await createImageBitmap(await response.blob());
+
+            cubeTexture = pGraphics.device.createTexture({
+                size: [imageBitmap.width, imageBitmap.height, 1],
+                format: 'rgba8unorm',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+
+            pGraphics.device.queue.copyExternalImageToTexture(
+                { source: imageBitmap },
+                { texture: cubeTexture },
+                [imageBitmap.width, imageBitmap.height]
+            );
+
+            // Create a sampler with linear filtering for smooth interpolation.
+            const sampler = pGraphics.device.createSampler({
+                magFilter: 'linear',
+                minFilter: 'linear',
+            });
+
+            debugger;
             requestAnimationFrame(updateAndRender);
         }
 
@@ -618,34 +635,15 @@
             directionalLight.setEnabled(directionalLightState.enabled);
             directionalLight.setIntensity(directionalLightState.intensity);
 
-            pointLight.setPosition([pointLightState.position.x, pointLightState.position.y, pointLightState.position.z, 1.0]);
-            pointLight.setColor([pointLightState.color.r, pointLightState.color.g, pointLightState.color.b, pointLightState.color.a]);
-            pointLight.setEnabled(pointLightState.enabled);
-            pointLight.setIntensity(pointLightState.intensity);
-            pointLight.setRange(pointLightState.range);
-            pointLight.setConstantAttenuation(pointLightState.kc);
-            pointLight.setLinealAttenuation(pointLightState.kl);
-            pointLight.setQuadraticAttenuation(pointLightState.kq);
-
-            spotLight.setPosition([spotLightState.position.x, spotLightState.position.y, spotLightState.position.z, 1.0]);
-            spotLight.setDirection([spotLightState.direction.x, spotLightState.direction.y, spotLightState.direction.z, 0.0]);
-            spotLight.setColor([spotLightState.color.r, spotLightState.color.g, spotLightState.color.b, spotLightState.color.a]);
-            spotLight.setEnabled(spotLightState.enabled);
-            spotLight.setIntensity(spotLightState.intensity);
-            spotLight.setRange(spotLightState.range);
-            spotLight.setConstantAttenuation(spotLightState.kc);
-            spotLight.setLinealAttenuation(spotLightState.kl);
-            spotLight.setQuadraticAttenuation(spotLightState.kq);
-            spotLight.setSpotAngle(glMatrix.glMatrix.toRadian(spotLightState.spotAngle));
-            spotLight.setInnerAngle(spotLightState.spotInnerAngle);
-            spotLight.setExternAngle(spotLightState.spotExternAngle);
-
             //--------------- end update lights and materials from the UI state ---------------
 
             input();
 
-            spherePhong.update(dt);
-            sphereGourad.update(dt);
+            angleRot += 0.5;
+            angleRot = angleRot % 360;
+            cube.getTransform().rotateAbsolute(glMatrix.glMatrix.toRadian(angleRot), glMatrix.glMatrix.toRadian(angleRot), 0.0);
+
+            cube.update(dt);
             grid.update(dt);
         }
 
@@ -676,20 +674,14 @@
 
             pGraphics.device.queue.writeBuffer(material.getBuffer().getWebGPUBuffer(), 0, material.getData());
             pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
-            pGraphics.device.queue.writeBuffer(pointLight.getBuffer().getWebGPUBuffer(), 0, pointLight.getData());
-            pGraphics.device.queue.writeBuffer(spotLight.getBuffer().getWebGPUBuffer(), 0, spotLight.getData());
 
             pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-            //pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
-            pass.setBindGroup(pointLight.getGroup(), pointLight.getBindGroup());
+            pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
             pass.setBindGroup(material.getGroup(), material.getBindGroup());
 
             pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
 
-            spherePhong.render(pass);
-
-            pass.setPipeline(gouradShadingPipeline.getWebGPUPipeline());
-            sphereGourad.render(pass);
+            cube.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props

@@ -8,7 +8,7 @@ class DogPointLight {
     /**
      * Make an instances of a point light.
      */
-    constructor(){
+    constructor(createBuffer = true, createBindGroup = true) {
         this.position = [0.0, 0.0, 0.0];
         this.color = [1.0, 1.0, 1.0, 1.0];
         this.range = 1.0;
@@ -18,7 +18,37 @@ class DogPointLight {
         this.intensity = 1.0;
         this.enabled = true;
 
-        var idCount = -1;
+        let idCount = -1;
+
+        if (createBuffer) {
+            idCount = resourceManager.getCounter();
+            const bufferSize = 16 * 4;
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogPointLight" + idCount, BufferType.Data, null, bufferSize, true);
+        }
+
+        const jsonObj = resourceManager.getGroupAndBinding("DogPointLight");
+        this.group = jsonObj.group;
+        this.binding = jsonObj.binding;
+
+        if (createBindGroup) {
+            const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
+
+            const objLayout = {
+                label: "Point Light Bind Group",
+                layout: bindGroupLayout,
+                entries: [{
+                    binding: this.binding,
+                    resource: { buffer: resourceManager.get(this.idBuffer).getWebGPUBuffer() }
+                }],
+            };
+
+            idCount = (idCount == -1) ? resourceManager.getCounter() : idCount;
+
+            this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
+        }
+
+        /*var idCount = -1;
 
         try {
             const jsonObject = resourceManager.getConfigComponentByName("DogPointLight");
@@ -43,14 +73,14 @@ class DogPointLight {
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
-        }
+        }*/
     }
 
     /**
      * Get the color of the light
      * @returns {Vector4} Color of the light
      */
-    getColor(){
+    getColor() {
         return this.color;
     }
 
@@ -58,7 +88,7 @@ class DogPointLight {
      * Get the position of the light
      * @returns {Vector3} the position of the light
      */
-    getPosition(){
+    getPosition() {
         return this.position;
     }
 
@@ -66,7 +96,7 @@ class DogPointLight {
      * Get if the light is on or off
      * @returns {boolean} On of off light
      */
-    isEnabled(){
+    isEnabled() {
         return this.enabled;
     }
 
@@ -74,7 +104,7 @@ class DogPointLight {
      * Get the intensity of the light
      * @returns {float} The intensity of the light
      */
-    getIntensity(){
+    getIntensity() {
         return this.intensity;
     }
 
@@ -82,7 +112,7 @@ class DogPointLight {
      * Set the color of the light
      * @param {Vector4} color Color of the light
      */
-    setColor(color){
+    setColor(color) {
         this.color = color;
     }
 
@@ -90,7 +120,7 @@ class DogPointLight {
      * Set the position of the light
      * @param {Vector3} position Position of the light
      */
-    setPosition(position){
+    setPosition(position) {
         this.position = position;
     }
 
@@ -98,7 +128,7 @@ class DogPointLight {
      * Turn on or off the light
      * @param {boolean} enabled True or false to turn on of off the light
      */
-    setEnabled(enabled){
+    setEnabled(enabled) {
         this.enabled = enabled;
     }
 
@@ -106,7 +136,7 @@ class DogPointLight {
      * Set the intensity of the light
      * @param {float} intensity Intensity of the light
      */
-    setIntensity(intensity){
+    setIntensity(intensity) {
         this.intensity = intensity;
     }
 
@@ -114,7 +144,7 @@ class DogPointLight {
      * Get the constant attenuation
      * @returns {float} Constant attenuation
      */
-    getConstantAttenuation(){
+    getConstantAttenuation() {
         return this.kc;
     }
 
@@ -122,7 +152,7 @@ class DogPointLight {
      * Get the lineal attenuation
      * @returns {float} Lineal attenuation
      */
-    getLinealAttenuation(){
+    getLinealAttenuation() {
         return this.kl;
     }
 
@@ -130,7 +160,7 @@ class DogPointLight {
      * Get the quadratic attenuation
      * @returns {float} Quadratic attenuation
      */
-    getQuadraticAttenuation(){
+    getQuadraticAttenuation() {
         return this.kq;
     }
 
@@ -138,7 +168,7 @@ class DogPointLight {
      * Set the constant attenuation
      * @param {float} kc 
      */
-    setConstantAttenuation(kc){
+    setConstantAttenuation(kc) {
         this.kc = kc;
     }
 
@@ -146,7 +176,7 @@ class DogPointLight {
      * Set the lineal attenuation
      * @param {float} kl 
      */
-    setLinealAttenuation(kl){
+    setLinealAttenuation(kl) {
         this.kl = kl;
     }
 
@@ -154,7 +184,7 @@ class DogPointLight {
      * Set the quadratic attenuation
      * @param {float} kq 
      */
-    setQuadraticAttenuation(kq){
+    setQuadraticAttenuation(kq) {
         this.kq = kq;
     }
 
@@ -162,7 +192,7 @@ class DogPointLight {
      * Get the range
      * @returns {float} range
      */
-    getRange(){
+    getRange() {
         return this.range;
     }
 
@@ -170,7 +200,7 @@ class DogPointLight {
      * Set the range
      * @param {float} range 
      */
-    setRange(range){
+    setRange(range) {
         this.range = range;
     }
 
@@ -180,15 +210,15 @@ class DogPointLight {
      * Get the bind group for the point light.
      * @returns {GPUBindGroup} Bind group for the point light.
      */
-    getBindGroup(){
-        return this.bindGroup;
+    getBindGroup() {
+        return resourceManager.getBindGroup(this.idBindGroup);
     }
 
     /**
      * Get the buffer of the point light.
      * @returns {GPUBuffer} Buffer of the point light.
      */
-    getBuffer(){
+    getBuffer() {
         return resourceManager.get(this.idBuffer);
     }
 
@@ -196,8 +226,24 @@ class DogPointLight {
      * Gets the group to belong this component in the shaders.
      * @returns {int} group Group
      */
-    getGroup(){
+    getGroup() {
         return this.group;
+    }
+
+    /**
+     * Get the binding to belong this component in the shaders.
+     * @returns {int} binding Binding
+     */
+    getBinding() {
+        return this.binding;
+    }
+
+    /**
+     * Set the ID of the bind group.
+     * @param {int} idBindGroup ID of the bind group.
+     */
+    setIdBindGroup(idBindGroup) {
+        this.idBindGroup = idBindGroup;
     }
 
     /**

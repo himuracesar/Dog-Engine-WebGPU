@@ -7,14 +7,47 @@ class DogDirectionalLight {
     /**
      * Creates an instance of directional light.
      */
-    constructor(){
+    constructor(createBuffer = true, createBindGroup = true) {
         this.color = [1.0, 1.0, 1.0, 1.0];
         this.position = [1.0, -1.0, -1.0, 1.0];
-	    this.direction = [1.0, -1.0, -1.0, 0.0];
-	    this.enabled = true;
-	    this.intensity = 1.0;
+        this.direction = [1.0, -1.0, -1.0, 0.0];
+        this.enabled = true;
+        this.intensity = 1.0;
 
-        var idCount = -1;
+        this.idBuffer = -1;
+        this.idBindGroup = -1;
+
+        let idCount = -1;
+
+        if (createBuffer) {
+            idCount = resourceManager.getCounter();
+            const bufferSize = 16 * 4;
+
+            this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight" + idCount, BufferType.Data, null, bufferSize, true);
+        }
+
+        const jsonObj = resourceManager.getGroupAndBinding("DogDirectionalLight");
+        this.group = jsonObj.group;
+        this.binding = jsonObj.binding;
+
+        if (createBindGroup) {
+            const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
+
+            const objLayout = {
+                label: "Directional Light Bind Group",
+                layout: bindGroupLayout,
+                entries: [{
+                    binding: this.binding,
+                    resource: { buffer: resourceManager.get(this.idBuffer).getWebGPUBuffer() }
+                }],
+            };
+
+            idCount = (idCount == -1) ? resourceManager.getCounter() : idCount;
+
+            this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
+        }
+
+        /*var idCount = -1;
 
         try {
             const jsonObject = resourceManager.getConfigComponentByName("DogDirectionalLight");
@@ -39,14 +72,14 @@ class DogDirectionalLight {
             this.bindGroup = null; 
             this.group = -1;
             this.binding = -1;
-        }
+        }*/
     }
 
     /**
      * Get the color of the light
      * @returns {Vector4} Color of the light
      */
-    getColor(){
+    getColor() {
         return this.color;
     }
 
@@ -54,7 +87,7 @@ class DogDirectionalLight {
      * Get the direction of the light
      * @returns {Vector3} the direction of the light
      */
-    getDirection(){
+    getDirection() {
         return this.direction;
     }
 
@@ -62,7 +95,7 @@ class DogDirectionalLight {
      * Get if the light is on or off
      * @returns {boolean} On of off light
      */
-    isEnabled(){
+    isEnabled() {
         return this.enabled;
     }
 
@@ -70,7 +103,7 @@ class DogDirectionalLight {
      * Get the intensity of the light
      * @returns {float} The intensity of the light
      */
-    getIntensity(){
+    getIntensity() {
         return this.intensity;
     }
 
@@ -78,7 +111,7 @@ class DogDirectionalLight {
      * Set the color of the light
      * @param {Vector4} color Color of the light
      */
-    setColor(color){
+    setColor(color) {
         this.color = color;
     }
 
@@ -86,7 +119,7 @@ class DogDirectionalLight {
      * Set the direction of the light
      * @param {Vector3} direction Direction of the light
      */
-    setDirection(direction){
+    setDirection(direction) {
         this.direction = direction;
     }
 
@@ -94,7 +127,7 @@ class DogDirectionalLight {
      * Turn on or off the light
      * @param {boolean} enabled True or false to turn on of off the light
      */
-    setEnabled(enabled){
+    setEnabled(enabled) {
         this.enabled = enabled;
     }
 
@@ -102,7 +135,7 @@ class DogDirectionalLight {
      * Set the intensity of the light
      * @param {float} intensity Intensity of the light
      */
-    setIntensity(intensity){
+    setIntensity(intensity) {
         this.intensity = intensity;
     }
 
@@ -110,7 +143,7 @@ class DogDirectionalLight {
      * Get the position of the light.
      * @returns {Vector4} position
      */
-    getPosition(){
+    getPosition() {
         return this.position;
     }
 
@@ -118,7 +151,7 @@ class DogDirectionalLight {
      * Position of the light.
      * @param {Vector4} position 
      */
-    setPosition(position){
+    setPosition(position) {
         this.position = position;
     }
 
@@ -128,15 +161,15 @@ class DogDirectionalLight {
      * Get the bind group for the directional light.
      * @returns {GPUBindGroup} Bind group for the directional light.
      */
-    getBindGroup(){
-        return this.bindGroup;
+    getBindGroup() {
+        return resourceManager.getBindGroup(this.idBindGroup);
     }
 
     /**
      * Get the buffer of the directional light.
      * @returns {GPUBuffer} Buffer of the directional light.
      */
-    getBuffer(){
+    getBuffer() {
         return resourceManager.get(this.idBuffer);
     }
 
@@ -144,8 +177,24 @@ class DogDirectionalLight {
      * Gets the group to belong this component in the shaders.
      * @returns {int} group Group
      */
-    getGroup(){
+    getGroup() {
         return this.group;
+    }
+
+    /**
+     * Get the binding to belong this component in the shaders.
+     * @returns {int} binding Binding
+     */
+    getBinding() {
+        return this.binding;
+    }
+
+    /**
+     * Set the ID of the bind group.
+     * @param {int} idBindGroup ID of the bind group.
+     */
+    setIdBindGroup(idBindGroup) {
+        this.idBindGroup = idBindGroup;
     }
 
     /**
