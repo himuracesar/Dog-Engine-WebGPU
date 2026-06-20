@@ -53,33 +53,6 @@ class DogSpotLight {
 
             this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
         }
-
-        /*var idCount = -1;
-
-        try {
-            const jsonObject = resourceManager.getConfigComponentByName("DogSpotLight");
-            idCount = resourceManager.getCounter();
-
-            this.group = jsonObject.group;
-            this.binding = jsonObject.binding;
-
-            if(jsonObject.idBuffer == -1) {
-                idCount = resourceManager.getCounter();
-                this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight" + idCount, BufferType.Data, null, jsonObject.bufferSize, true);
-                this.bindGroup = webGPUengine.createBindGroup("DogSpotLight", jsonObject.binding, jsonObject.bindGroupLayout, resourceManager.get(this.idBuffer));
-            } else {
-                this.idBuffer = jsonObject.idBuffer;
-                this.bindGroup = jsonObject.bindGroup;
-            }
-        } catch(error) {
-            console.log("DogSpotLight: The bind group layouts are automatically created");
-
-            const bufferSize = 24 * 4;
-            this.idBuffer = webGPUengine.createDogBuffer("DogSpotLight"  + idCount, BufferType.Data, null, bufferSize, true);
-            this.bindGroup = null; 
-            this.group = -1;
-            this.binding = -1;
-        }*/
     }
 
     /**

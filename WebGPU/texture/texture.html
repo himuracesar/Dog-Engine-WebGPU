@@ -241,7 +241,7 @@
     <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
-    <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/Phong_wTexShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
 
     <script type="text/javascript" src="configScene.js"></script>
@@ -401,7 +401,7 @@
             spotLight.setAngleZ(glMatrix.glMatrix.toRadian(0.0));
             spotLight.setDirection([0.0, -1.0, 0.0]);
 
-            material = new DogMaterial();
+            material = new DogMaterial(true, false);
             material.setDiffuseColor([0.8, 0.8, 0.8, 1.0]);
             material.setSpecularColor([1.0, 1.0]);
             material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
@@ -474,7 +474,7 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.loadConfig("/DogEngine/config/configScene.json");
+            let configScene = await webGPUengine.loadConfig("/DogEngine/config/camera-lighting-material-mesh.json");
 
             webGPUengine.createBindGroupLayouts(configScene);
 
@@ -514,8 +514,6 @@
             pointLight.setIdBindGroup(idBindGroupLighting);
             spotLight.setIdBindGroup(idBindGroupLighting);
 
-            angleRot = 0.0;
-
             //------------------------------ Texture -------------------------------------
             const response = await fetch('/images/DogPrint02.png');
             const imageBitmap = await createImageBitmap(await response.blob());
@@ -525,6 +523,8 @@
                 format: 'rgba8unorm',
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
             });
+
+            const cubeTextureView = cubeTexture.createView();
 
             pGraphics.device.queue.copyExternalImageToTexture(
                 { source: imageBitmap },
@@ -538,7 +538,30 @@
                 minFilter: 'linear',
             });
 
-            debugger;
+            const jsonMaterial = {
+                label: "Material Bind Group",
+                layout: resourceManager.getBindGroupLayout(2),
+                entries: [
+                    {
+                        binding: material.getBinding(),
+                        resource: { buffer: material.getBuffer().getWebGPUBuffer() }
+                    },
+                    {
+                        binding: 1,
+                        resource: cubeTextureView
+                    },
+                    {
+                        binding: 2,
+                        resource: sampler
+                    }
+                ]
+            };
+
+            let idBindGroupMaterial = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMaterial);
+            material.setIdBindGroup(idBindGroupMaterial);
+
+            angleRot = 0.0;
+
             requestAnimationFrame(updateAndRender);
         }
 

@@ -130,8 +130,8 @@ const GPUVisibility = Object.freeze({
             format: canvasFormat,
         });
 
-        console.log("Max Uniform Buffers per group: ", device.limits.maxUniformBuffersPerShaderStage);
-        console.log("Max Bind Groups simultaneously: ", device.limits.maxBindGroups); // El mínimo garantizado es 4
+        console.log("Dog Engine - Max Uniform Buffers per group: ", device.limits.maxUniformBuffersPerShaderStage);
+        console.log("Dog Engine - Max Bind Groups simultaneously: ", device.limits.maxBindGroups); // El mínimo garantizado es 4
 
         return {
             device: device,
@@ -141,124 +141,12 @@ const GPUVisibility = Object.freeze({
     }
 
     /**
-     * Create the different bind group layouts.
-     * @param {Array} descriptors Contains JSON objects to create the bind group layouts.
-     * @returns {Array} Array of bind group layouts of WebGPU.
+     * Create bind groups based on the input JSON configuration.
+     * @param {JSON Object} groups - An array of configuration objects, each containing
+     *                               group, binding, and entry information for creating
+     *                               bind groups.
+     * @returns {string} The name of the bind group.
      */
-    function createBindGroupLayoutsV1(descriptors = []) {
-        var bindGroupsLayouts = [];
-
-        var desc = [
-            [{ name: "DogCamera", label: "Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
-            [{ name: "DogTransform", label: "Transform", group: 1, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
-        ];
-
-        if (descriptors.length > 0)
-            desc = descriptors;
-
-        var idBindGroupLayout = -1;
-        for (var i = 0; i < desc.length; i++) {
-            var bgl = desc[i];
-
-            idBindGroupLayout++;
-
-            const entries = [];
-            for (var j = 0; j < bgl.length; j++) {
-                const e = {
-                    binding: bgl[j].binding,
-                    visibility: bgl[j].visibility,
-                    buffer: { type: "uniform" }
-                };
-
-                entries.push(e);
-
-                var idCount = -1;
-
-                try {
-                    idCount = resourceManager.getCounter();
-                } catch (error) {
-                    console.log("WebGPUEngine::createBindGroupLayouts - The Resource Manager is not initialized:", error);
-                }
-
-                const idBuffer = createDogBuffer(bgl[j].name + idCount, BufferType.Data, null, bgl[j].bufferSize, true);
-
-                bindGroupsLayouts.push({
-                    name: bgl[j].name,
-                    group: bgl[j].group,
-                    binding: bgl[j].binding,
-                    idBindGroupLayout: idBindGroupLayout,
-                    bindGroupLayout: null,
-                    bufferSize: bgl[j].bufferSize,
-                    idBuffer: idBuffer,
-                    bindGroup: null
-                });
-            }
-
-            const bindGroupLayout = pGraphics.device.createBindGroupLayout({
-                label: bgl.label,
-                entries: entries
-            });
-
-            const start = bindGroupsLayouts.length - 1;
-            const length = bindGroupsLayouts.length - bgl.length;
-            for (var j = start; j >= length; j--) {
-                bindGroupsLayouts[j].bindGroupLayout = bindGroupLayout;
-            }
-        }
-
-        bindGroupsLayouts = createBindGroups(bindGroupsLayouts);
-
-        const bindings = new Map();
-        for (var i = 0; i < bindGroupsLayouts.length; i++) {
-            if (!bindings.has(bindGroupsLayouts[i].name))
-                bindings.set(bindGroupsLayouts[i].name, new GeeksQueue());
-
-            bindings.get(bindGroupsLayouts[i].name).enqueue(bindGroupsLayouts[i]);
-        }
-
-        resourceManager.setConfigComponents(bindings);
-        return bindings;
-    }
-
-    /**
-     * Create the bind groups with the bind group layouts and buffers of the input array.
-     * The second loop is to set the same bind group to the JSON objects with the same bind group layout, because they are the same bind group.
-     * @param {Array of JSON objects} input Array of JSON objects with the information to create the bind groups.
-     * @returns {Array} Array of JSON objects with the bind groups created. Each JSON object has the same information as the input plus the bind group created.
-     */
-    function createBindGroups(input) {
-        var entries = [];
-        for (var i = 0; i < input.length; i++) {
-            const buffer = resourceManager.get(input[i].idBuffer);
-
-            const e = {
-                binding: input[i].binding,
-                resource: { buffer: buffer.getWebGPUBuffer() }
-            };
-
-            entries.push(e);
-
-            if (i + 1 < input.length && input[i].idBindGroupLayout == input[i + 1].idBindGroupLayout)
-                continue;
-
-            const bindGroup = pGraphics.device.createBindGroup({
-                label: input[i].label,
-                layout: input[i].bindGroupLayout,
-                entries: entries,
-            });
-
-            input[i].bindGroup = bindGroup;
-            entries = [];
-        }
-
-        for (var i = input.length - 1; i > 0; i--)
-            if (input[i - 1].idBindGroupLayout == input[i].idBindGroupLayout)
-                input[i - 1].bindGroup = input[i].bindGroup;
-
-        return input;
-    }
-
-
     function createBindGroup(id, descriptor) {
         const bindGroup = pGraphics.device.createBindGroup(
             descriptor

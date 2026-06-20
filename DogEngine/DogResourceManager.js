@@ -23,7 +23,7 @@ class DogResourceManager {
      */
     addBindGroupLayout(group, bindGroupLayout) {
         if (this.bindGroupLayouts.has(group)) {
-            throw new Error(`Bind group layout with group ${group} already exists`);
+            throw new Error(`DogResourceManager::addBindGroupLayout:: Bind group layout with group ${group} already exists`);
         }
         this.bindGroupLayouts.set(group, bindGroupLayout);
     }
@@ -83,45 +83,23 @@ class DogResourceManager {
         return this.groupsAndBindings.get(name);
     }
 
+    /**
+     * Adds a bind group to the manager.
+     * @param {string} name Name of the bind group.
+     * @param {GPUBindGroup} bindGroup The bind group to add.
+     */
     addBindGroup(name, bindGroup) {
         this.bindGroups.set(name, bindGroup);
     }
 
+    /**
+     * Gets a bind group from the manager.
+     * @param {string} name Name of the bind group.
+     * @returns {GPUBindGroup} The requested bind group, or undefined if not found.
+     */
     getBindGroup(name) {
         return this.bindGroups.get(name);
     }
-
-    /**
-     * Sets the configuration components for the scenes and shaders.
-     * @param {Map<string, GeeksQueue>} bindings Contains the configuration components for the scenes and shaders, 
-     * where the key is the name of the component and the value is a queue of JSON objects with the information to create the bind groups.
-     */
-    /*setConfigComponents(bindings) {
-        this.configComponents = bindings;
-    }*/
-
-    /**
-     * Gets a configuration component by its name. If the component is found, it returns the first JSON object in the queue. 
-     * If the queue has more than one JSON object, it removes the first one from the queue. If the component is not found, it returns null.
-     * The queue has to have al least one JSON object with the information to create the bind group and buffer for the component.
-     * @param {string} name The name of the component. For example, "DogCamera" for the camera component.
-     * @returns {JSON} The requested configuration component, or null if not found.
-     */
-    /*getConfigComponentByName(name) {
-        var bind = null;
-        if (this.configComponents.has(name)) {
-            bind = Object.assign({}, this.configComponents.get(name).peek());
-
-            this.configComponents.get(name).peek().bindGroup = null;
-            this.configComponents.get(name).peek().idBuffer = -1;
-
-            if (this.configComponents.get(name).getSize() > 1) {
-                this.configComponents.get(name).dequeue();
-            }
-        }
-
-        return bind;
-    }*/
 }
 
 let resourceManager = new DogResourceManager();
