@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -38,31 +39,55 @@
             top: 0;
             left: 0;
             z-index: 1;
-            transform: translateZ(0); /* Force GPU Layer */
+            transform: translateZ(0);
+            /* Force GPU Layer */
         }
-        
+
         /* Containers for the Widgets */
         .widget-pane {
             /*position: fixed;*/
             position: absolute;
             z-index: 10;
             width: 260px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
             /* Avoid that events affect the canvas if not necessary */
-            pointer-events: auto; 
+            pointer-events: auto;
 
-            transform: translateZ(0); /* Crea un nuevo stacking context en GPU */
+            transform: translateZ(0);
+            /* Crea un nuevo stacking context en GPU */
             backface-visibility: hidden;
             perspective: 1000;
             will-change: transform, opacity;
         }
 
-        #ui-camera { top: 10px; right: 300px; }
-        #ui-geometry { top: 10px; right: 20px; }
-        #ui-performance { bottom: 20px; left: 10px; width: 200px; }
-        #ui-config { top: 10px; left: 10px; }
-        
-        .label { position: fixed; bottom: 10px; right: 20px; color: #555; font-size: 12px; }
+        #ui-camera {
+            top: 10px;
+            right: 300px;
+        }
+
+        #ui-geometry {
+            top: 10px;
+            right: 20px;
+        }
+
+        #ui-performance {
+            bottom: 20px;
+            left: 10px;
+            width: 200px;
+        }
+
+        #ui-config {
+            top: 10px;
+            left: 10px;
+        }
+
+        .label {
+            position: fixed;
+            bottom: 10px;
+            right: 20px;
+            color: #555;
+            font-size: 12px;
+        }
     </style>
 
     <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
@@ -86,14 +111,14 @@
         // --- Widget 1: Performance  ---
         const panePerformance = new Pane({ container: document.getElementById('ui-performance'), title: '📊 Performance' });
         panePerformance.addBinding(performanceState, 'fps', { label: 'FPS', readonly: true, view: 'number' }).on('change', emitUI);
-        panePerformance.addBinding(performanceState, 'fps', { 
-            label: 'FPS Graph', readonly: true, view: 'graph', 
-            interval: 100, bufferSize: 64, min: 10, max: 200 
+        panePerformance.addBinding(performanceState, 'fps', {
+            label: 'FPS Graph', readonly: true, view: 'graph',
+            interval: 100, bufferSize: 64, min: 10, max: 200
         }).on('change', emitUI);
 
         // --- Widget 2: Config  ---
         const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
-        paneConfig.addBinding(configState, 'background', { color: {type: 'float'} }).on('change', emitUI);
+        paneConfig.addBinding(configState, 'background', { color: { type: 'float' } }).on('change', emitUI);
 
 
         // Send data to the engine
@@ -116,9 +141,10 @@
 
     <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
-    
+
     <script type="text/javascript" src="/WebGPU/pipeline/ColorInstancingPipeline.js"></script>
 </head>
+
 <body onload="init();">
     <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
 
@@ -135,7 +161,7 @@
         /******* Events' names for clean communication *******/
         const EVT_DATA = 'engine-data-update';
         const EVT_UI = 'ui-params-change';
-        
+
         var angle = 0.0;
 
         var vertexBuffer;
@@ -156,39 +182,39 @@
         var transformData = new Float32Array(16 * numInstances);
 
         //------------------- Demo's main functions -------------------
-        function createShapes(){
+        function createShapes() {
             // position (3), color (4)
             const vertices = new Float32Array([
                 //Front
-                -1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //0
-                 1.0, -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //1
-                 1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //2
-                -1.0,  1.0,  1.0, 1.0, 0.0, 0.0, 1.0, //3
+                -1.0, -1.0, 1.0, 1.0, 0.0, 0.0, 1.0, //0
+                1.0, -1.0, 1.0, 1.0, 0.0, 0.0, 1.0, //1
+                1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, //2
+                -1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, //3
                 //Right
-                1.0, -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //4
+                1.0, -1.0, 1.0, 0.0, 1.0, 0.0, 1.0, //4
                 1.0, -1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //5
-                1.0,  1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //6
-                1.0,  1.0,  1.0, 0.0, 1.0, 0.0, 1.0, //7
+                1.0, 1.0, -1.0, 0.0, 1.0, 0.0, 1.0, //6
+                1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, //7
                 //Back
-                 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //8
+                1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //8
                 -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //9
-                -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //10
-                 1.0,  1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //11
+                -1.0, 1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //10
+                1.0, 1.0, -1.0, 0.0, 0.0, 1.0, 1.0, //11
                 //Left
                 -1.0, -1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //12
-                -1.0, -1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //13
-                -1.0,  1.0,  1.0, 1.0, 1.0, 0.0, 1.0, //14
-                -1.0,  1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //15
+                -1.0, -1.0, 1.0, 1.0, 1.0, 0.0, 1.0, //13
+                -1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, //14
+                -1.0, 1.0, -1.0, 1.0, 1.0, 0.0, 1.0, //15
                 //Top
-                -1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //16
-                 1.0,  1.0,  1.0, 1.0, 0.0, 1.0, 1.0, //17
-                 1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //18
-                -1.0,  1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //19
+                -1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, //16
+                1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, //17
+                1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //18
+                -1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, //19
                 //Bottom
                 -1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //20
-                 1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //21
-                 1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0, //22
-                -1.0, -1.0,  1.0, 0.0, 1.0, 1.0, 1.0  //23
+                1.0, -1.0, -1.0, 0.0, 1.0, 1.0, 1.0, //21
+                1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, //22
+                -1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0  //23
             ]);
 
             const indices = new Uint16Array([
@@ -230,7 +256,7 @@
             indexBuffer.unmap();
         }
 
-        function createPipeline(){
+        function createPipeline() {
             colorInstancingPipeline = new ColorInstancingPipeline();
 
             depthTexture = pGraphics.device.createTexture({
@@ -240,7 +266,7 @@
             });
         }
 
-        function createBindings(){
+        function createBindings() {
             const modelBufferSize = 16 * 4 * numInstances; // Matrix4x4 has 16 floats, each float is 4 bytes
             modelBuffer = pGraphics.device.createBuffer({
                 size: modelBufferSize,
@@ -257,8 +283,8 @@
 
             const bindGroupLayout = pGraphics.device.createBindGroupLayout({
                 entries: [{
-                    binding: 0,                           
-                    visibility: GPUShaderStage.VERTEX, 
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX,
                     buffer: {
                         type: "uniform"
                     }
@@ -287,11 +313,11 @@
                     numFloatsForView));
             }
         }
-        
+
         /**
          * Updates all the matrices for each instance.
          */
-        function updateMatrices(){
+        function updateMatrices() {
             // update all the matrices
             const position = [-5.0, 0.0, 5.0];
             matrices.forEach((mat, ndx) => {
@@ -299,13 +325,13 @@
 
                 glMatrix.mat4.translate(matrix, matrix, [position[ndx], 0, 0]);
 
-                if(ndx == 0)
+                if (ndx == 0)
                     glMatrix.mat4.rotateY(matrix, matrix, angle);
-                else if(ndx == 1)
+                else if (ndx == 1)
                     glMatrix.mat4.rotateX(matrix, matrix, angle);
-                else if(ndx == 2) 
+                else if (ndx == 2)
                     glMatrix.mat4.rotateZ(matrix, matrix, angle);
-    
+
                 mat.set(matrix);
             });
 
@@ -323,7 +349,7 @@
         /**
          * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
          */
-        async function init(){
+        async function init() {
             canvas = document.getElementById("WebGPUcanvas");
 
             pGraphics = await webGPUengine.initWebGPU(canvas);
@@ -334,14 +360,9 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            resourceManager = new DogResourceManager();
+            let configScene = await webGPUengine.readFileAsJson("/DogEngine/config/camera-scene.json");
 
-            /*const groupLayouts = [
-                [{ name: "DogCamera", label:"Camera", group: 0, binding: 0, bufferSize: 16 * 4 * 2, visibility: GPUVisibility.Vertex }],
-                [{ name: "DogTransform", label: "Transform", group: 3, binding: 0, bufferSize: 16 * 4, visibility: GPUVisibility.Vertex }]
-            ];*/
-
-            webGPUengine.createBindGroupLayouts();
+            webGPUengine.createBindGroupLayouts(configScene);
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 5.0]);
@@ -401,7 +422,7 @@
             mouse.x = this.x;
             mouse.y = this.y;
 
-            if (!this.dragging) 
+            if (!this.dragging)
                 return;
 
             const dx = this.x - this.lastX;
@@ -414,22 +435,22 @@
         /**
          * Handles input events.
          */
-        function input(){
-            if(keypress[KeyCode.W])
+        function input() {
+            if (keypress[KeyCode.W])
                 camera.moveForward(1);
-            if(keypress[KeyCode.S])
+            if (keypress[KeyCode.S])
                 camera.moveForward(-1);
-            if(keypress[KeyCode.A])
+            if (keypress[KeyCode.A])
                 camera.strafe(-1);
-            if(keypress[KeyCode.D])
+            if (keypress[KeyCode.D])
                 camera.strafe(1);
-            if(keypress[KeyCode.Left])
+            if (keypress[KeyCode.Left])
                 camera.yaw(0.01);
-            if(keypress[KeyCode.Right])
+            if (keypress[KeyCode.Right])
                 camera.yaw(-0.01);
-            if(keypress[KeyCode.Up])
+            if (keypress[KeyCode.Up])
                 camera.pitch(0.01);
-            if(keypress[KeyCode.Down])
+            if (keypress[KeyCode.Down])
                 camera.pitch(-0.01);
         }
 
@@ -438,15 +459,15 @@
          * Updates the performance state and handles input.
          * @param {float} time - The current time in milliseconds.
          */
-        function update(time){
+        function update(time) {
             const dt = (time - lastTime);
             lastTime = time;
-            
+
             performanceState.fps = 1000 / dt;
 
             input();
 
-            angle += 0.001 * dt; 
+            angle += 0.001 * dt;
             angle = angle % 360;
 
             updateMatrices();
@@ -455,17 +476,17 @@
         /**
          * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
          */
-        function render(){
+        function render() {
             // Rendering logic goes here (e.g., issuing draw calls)
             const encoder = pGraphics.device.createCommandEncoder();
             const pass = encoder.beginRenderPass({
-            colorAttachments: [{
+                colorAttachments: [{
                     view: pGraphics.context.getCurrentTexture().createView(),
                     loadOp: "clear",
-                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a }, 
+                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a },
                     storeOp: "store",
                 }],
-                
+
                 depthStencilAttachment: {
                     view: depthTexture.createView(),
                     depthClearValue: 1.0, // 1.0 es el punto más lejano
@@ -497,7 +518,7 @@
          * Combines the update and render functions into a single loop that runs on each animation frame.
          * @param {float} currentTime - The current time in milliseconds.
          */
-        function updateAndRender(currentTime){
+        function updateAndRender(currentTime) {
             update(currentTime);
             render();
 
@@ -505,4 +526,5 @@
         }
     </script>
 </body>
+
 </html>
