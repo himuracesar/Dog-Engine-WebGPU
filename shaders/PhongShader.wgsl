@@ -5,15 +5,6 @@ struct VertexOutput {
     @location(3) positionWV : vec3<f32>
 };
 
-struct Camera {
-    viewMatrix : mat4x4<f32>,
-    projectionMatrix : mat4x4<f32>,
-};
-
-struct Model {
-    modelMatrix : mat4x4<f32>
-};
-
 @group(0) @binding(0)
 var<uniform> camera: Camera;
 
@@ -68,21 +59,21 @@ fn fragmentMain(@location(1) normal: vec3f, @location(2) texCoord: vec2f, @locat
     );
 
     if(directionalLight.enabled > 0){
-        var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz));
+        var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz), false);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
     }
 
     if(pointLight.enabled > 0){
-        var l = ComputePointLight(pointLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz));
+        var l = ComputePointLight(pointLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz), false);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
     }
 
     if(spotLight.enabled > 0){
-        var l = ComputeSpotLight(spotLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz));
+        var l = ComputeSpotLight(spotLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz), false);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
