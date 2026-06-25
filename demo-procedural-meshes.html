@@ -321,7 +321,7 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.loadConfig("/DogEngine/config/camera-mesh-scene.json");
+            let configScene = await webGPUengine.readFileAsJson("/DogEngine/config/camera-mesh-scene.json");
 
             webGPUengine.createBindGroupLayouts(configScene);
 

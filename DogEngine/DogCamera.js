@@ -38,7 +38,7 @@ class DogCamera {
             idCount = resourceManager.getCounter();
             const bufferSize = 16 * 4 * 2;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogCamera" + idCount, BufferType.Data, null, bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogCamera-Buffer" + idCount, BufferType.Data, null, bufferSize, true);
         }
 
         if (createBindGroup) {

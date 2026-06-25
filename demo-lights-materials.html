@@ -483,7 +483,7 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.loadConfig("/DogEngine/config/configScene.json");
+            let configScene = await webGPUengine.readFileAsJson("/DogEngine/config/configScene.json");
 
             webGPUengine.createBindGroupLayouts(configScene);
 

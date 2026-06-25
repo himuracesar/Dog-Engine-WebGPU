@@ -3,10 +3,12 @@
  * @author César Himura
  * @version 1.0
  */
-class DogMaterial {
+class DogMaterial extends DogResource {
 
-    constructor(createBuffer = true, createBindGroup = true) {
-        this.name = "";
+    constructor(name, createBuffer = true, createBindGroup = true) {
+        super(name);
+
+        this.name = name;
         this.ambientColor = [0.0, 0.0, 0.0, 1.0];
         this.diffuseColor = [0.0, 0.0, 0.0, 1.0];
         this.specularColor = [0.0, 0.0, 0.0, 1.0];
@@ -14,9 +16,9 @@ class DogMaterial {
         this.specularPower = 32.0;
         this.transparency = 1;
         this.opticalDensity = 1; //Ni obj file
-        this.diffuseTextureIndex = -1;
-        this.normalMapIndex = -1;
-        this.bumpMapIndex = -1;
+        this.diffuseTextureIndex = "";
+        this.normalMapIndex = "";
+        this.bumpMapIndex = "";
         this.roughness = 0.0;
         this.metallness = 0.0;
         this.fresnel = 0.0;
@@ -33,7 +35,7 @@ class DogMaterial {
             idCount = resourceManager.getCounter();
             const bufferSize = 24 * 4;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial" + idCount, BufferType.Data, null, bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial-Buffer" + idCount, BufferType.Data, null, bufferSize, true);
         }
 
         const jsonObj = resourceManager.getGroupAndBinding("DogMaterial");
@@ -56,14 +58,6 @@ class DogMaterial {
 
             this.idBindGroup = webGPUengine.createBindGroup(idCount, objLayout);
         }
-    }
-
-    /**
-     * Set the name 
-     * @param {string} name Name
-     */
-    setName(name) {
-        this.name = name;
     }
 
     /**
@@ -124,7 +118,7 @@ class DogMaterial {
 
     /**
      * Set the index of the diffuse texture
-     * @param {int} index Index
+     * @param {string} index Index
      */
     setDiffuseTextureIndex(index) {
         this.diffuseTextureIndex = index;
@@ -132,7 +126,7 @@ class DogMaterial {
 
     /**
      * Set the index of normal map
-     * @param {int} index Index
+     * @param {string} index Index
      */
     setNormalMapIndex(index) {
         this.normalMapIndex = index;
@@ -140,7 +134,7 @@ class DogMaterial {
 
     /**
      * Set the index of bump map
-     * @param {int} index Index
+     * @param {string} index Index
      */
     setBumpMapIndex(index) {
         this.bumpMapIndex = index;

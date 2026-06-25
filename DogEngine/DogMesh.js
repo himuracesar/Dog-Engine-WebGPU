@@ -27,8 +27,8 @@ class DogMesh {
      * other property that needs to be updated every frame.
      * @param {float} deltaTime 
      */
-    update(deltaTime){
-        if(this.boundingVolume != null){
+    update(deltaTime) {
+        if (this.boundingVolume != null) {
             const position = this.transform.getPosition();
             const rotation = this.transform.getRotation();
             const scale = this.transform.getScale();
@@ -44,11 +44,18 @@ class DogMesh {
      * vertex and index buffers are already set up and that the appropriate pipeline is bound.
      * @param {GPUEncoderPass} pass 
      */
-    render(pass){
+    render(pass) {
         pGraphics.device.queue.writeBuffer(this.transform.getBuffer().getWebGPUBuffer(), 0, this.transform.getTransformMatrix());
 
+        let material = resourceManager.get(this.idMaterial);
+        if (material !== undefined) {
+            pGraphics.device.queue.writeBuffer(material.getBuffer().getWebGPUBuffer(), 0, material.getData());
+
+            pass.setBindGroup(material.getGroup(), material.getBindGroup());
+        }
+
         pass.setBindGroup(this.transform.getGroup(), this.transform.getBindGroup());
-         //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
+        //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
         pass.drawIndexed(this.numIndices, 1, 0, 0, 0);
     }
 
@@ -56,7 +63,7 @@ class DogMesh {
      * Get the transform of the mesh.
      * @returns {DogTransform} The transform of the mesh.
      */
-    getTransform(){
+    getTransform() {
         return this.transform;
     }
 
@@ -64,7 +71,7 @@ class DogMesh {
      * Set the transform of the mesh.
      * @param {DogTransform} transform - The new transform of the mesh.
      */
-    setTransform(transform){
+    setTransform(transform) {
         this.transform = transform;
     }
 
@@ -72,23 +79,23 @@ class DogMesh {
      * Get the bounding volume of the mesh.
      * @returns {DogBoundingVolume} The bounding volume of the mesh.
      */
-    getBoundingVolume(){
+    getBoundingVolume() {
         return this.boundingVolume;
     }
 
     /**
      * Set the bounding volume of the mesh.
-     * @param {DogBoundingVolume} DogBoundingVolume - The new bounding volume of the mesh.
+     * @param {DogBoundingVolume} bounding - The new bounding volume of the mesh.
      */
-    setBoundingVolume(DogBoundingVolume){
-        this.boundingVolume = DogBoundingVolume;
+    setBoundingVolume(bounding) {
+        this.boundingVolume = bounding;
     }
 
     /**
      * Set the number of indices of the mesh.
      * @param {int} numIndices The new number of indices of the mesh.
      */
-    setNumIndices(numIndices){
+    setNumIndices(numIndices) {
         this.numIndices = numIndices;
     }
 
@@ -96,7 +103,7 @@ class DogMesh {
      * Get the number of indices of the mesh.
      * @returns {int} The number of indices of the mesh.
      */
-    getNumIndices(){
+    getNumIndices() {
         return this.numIndices;
     }
 
@@ -104,7 +111,7 @@ class DogMesh {
      * Set the number of vertices of the mesh.
      * @param {int} numVertices The new number of vertices of the mesh.
      */
-    setNumVertices(numVertices){
+    setNumVertices(numVertices) {
         this.numVertices = numVertices;
     }
 
@@ -112,7 +119,23 @@ class DogMesh {
      * Get the number of vertices of the mesh.
      * @returns {int} The number of vertices of the mesh.
      */
-    getNumVertices(){
+    getNumVertices() {
         return this.numVertices;
+    }
+
+    /**
+     * Set the ID of the material of the mesh.
+     * @param {string} idMaterial The ID of the material.
+     */
+    setIdMaterial(idMaterial) {
+        this.idMaterial = idMaterial;
+    }
+
+    /**
+     * Get the ID of the material of the mesh.
+     * @returns {string} The ID of the material.
+     */
+    getIdMaterial() {
+        return this.idMaterial;
     }
 }

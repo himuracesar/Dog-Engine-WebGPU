@@ -113,7 +113,9 @@ class PhongShadingPipeline extends DogPipeline {
                 }
 
                 //return lighting.ambient + lighting.diffuse + lighting.specular;
-                return textureSample(texture, samp, texCoord);
+                //return textureSample(texture, samp, texCoord);
+
+                return lighting.ambient + lighting.diffuse + lighting.specular + textureSample(texture, samp, texCoord);
             }
         `;
 

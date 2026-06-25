@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dog WebGPU - Texture</title>
+    <title>Dog WebGPU - Demo Texture</title>
 
     <style>
         :root {
@@ -236,7 +236,9 @@
     <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
     <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
     <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
-    <script type="text/javascript" src="/DogEngine/DogMaterial.js"></script>
+    <!--script type="text/javascript" src="/DogEngine/DogMaterial.js"></script-->
+    <!--script type="text/javascript" src="/DogEngine/DogTexture.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogSampler.js"></script-->
     <script type="text/javascript" src="/DogEngine/light/DogDirectionalLight.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogPointLight.js"></script>
     <script type="text/javascript" src="/DogEngine/light/DogSpotLight.js"></script>
@@ -401,11 +403,13 @@
             spotLight.setAngleZ(glMatrix.glMatrix.toRadian(0.0));
             spotLight.setDirection([0.0, -1.0, 0.0]);
 
-            material = new DogMaterial(true, false);
+            material = new DogMaterial("M_RED", true, false);
             material.setDiffuseColor([0.8, 0.8, 0.8, 1.0]);
             material.setSpecularColor([1.0, 1.0]);
             material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
             material.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
+
+            resourceManager.add(material.getName(), material);
 
             directionalLightState.color.r = directionalLight.getColor()[0];
             directionalLightState.color.g = directionalLight.getColor()[1];
@@ -515,28 +519,14 @@
             spotLight.setIdBindGroup(idBindGroupLighting);
 
             //------------------------------ Texture -------------------------------------
-            const response = await fetch('/images/Huella.jpg');
-            const imageBitmap = await createImageBitmap(await response.blob());
 
-            cubeTexture = pGraphics.device.createTexture({
-                size: [imageBitmap.width, imageBitmap.height, 1],
-                format: 'rgba8unorm',//'bgra8unorm', //'rgba8unorm-srgb', //'rgba8unorm',
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-            });
+            let texture = await webGPUengine.createDogTexture("/images/Huella.jpg");
+            let sampler = new DogSampler({ magFilter: 'linear', minFilter: 'linear' });
 
-            const cubeTextureView = cubeTexture.createView();
+            material.setDiffuseTextureIndex(texture.getName());
+            texture.setIdSampler(sampler.getName());
 
-            pGraphics.device.queue.copyExternalImageToTexture(
-                { source: imageBitmap },//, flipY: true },
-                { texture: cubeTexture },
-                [imageBitmap.width, imageBitmap.height]
-            );
-
-            // Create a sampler with linear filtering for smooth interpolation.
-            const sampler = pGraphics.device.createSampler({
-                magFilter: 'linear',
-                minFilter: 'linear',
-            });
+            cube.setMaterial(0, material.getName());
 
             const jsonMaterial = {
                 label: "Material Bind Group",
@@ -548,11 +538,11 @@
                     },
                     {
                         binding: 1,
-                        resource: cubeTextureView
+                        resource: texture.getGPUTextureView()
                     },
                     {
                         binding: 2,
-                        resource: sampler
+                        resource: sampler.getGPUSampler()
                     }
                 ]
             };
@@ -695,12 +685,10 @@
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
 
-            pGraphics.device.queue.writeBuffer(material.getBuffer().getWebGPUBuffer(), 0, material.getData());
             pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
 
             pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
             pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
-            pass.setBindGroup(material.getGroup(), material.getBindGroup());
 
             pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
 

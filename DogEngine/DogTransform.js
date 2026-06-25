@@ -31,7 +31,7 @@ class DogTransform {
             idCount = resourceManager.getCounter();
             const bufferSize = 16 * 4;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogTransform" + idCount, BufferType.Data, null, bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogTransform-Buffer" + idCount, BufferType.Data, null, bufferSize, true);
         }
 
         if (createBindGroup) {

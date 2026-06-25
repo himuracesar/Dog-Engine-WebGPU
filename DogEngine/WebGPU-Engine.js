@@ -24,6 +24,9 @@ include("/DogEngine/dataStructures/GeeksQueue.js");
 
 include("/DogEngine/DogResource.js");
 include("/DogEngine/DogBuffer.js");
+include("/DogEngine/DogTexture.js");
+include("/DogEngine/DogSampler.js");
+include("/DogEngine/DogMaterial.js");
 include("/DogEngine/DogTransform.js");
 include("/DogEngine/DogMesh.js");
 
@@ -118,6 +121,10 @@ const GPUVisibility = Object.freeze({
         }
 
         const adapter = await navigator.gpu.requestAdapter();
+        /*const adapter = await navigator.gpu.requestAdapter({
+            //powerPreference: 'high-performance' // <--- Dedicated GPU
+            powerPreference: 'low-power' // <--- Integrated GPU
+        });*/
         if (!adapter) {
             throw new Error("No appropriate GPUAdapter found.");
         }
@@ -130,6 +137,11 @@ const GPUVisibility = Object.freeze({
             format: canvasFormat,
         });
 
+        const info = adapter.info;
+        console.log(`Dog Engine - Vendor: ${info.vendor}`);      // Ej: "nvidia" o "intel"
+        console.log(`Dog Engine - Architecture: ${info.architecture}`);
+        console.log(`Dog Engine - Device: ${info.device}`);      // Nombre del modelo (si no está bloqueado por privacidad)
+        console.log(`Dog Engine - Description: ${info.description}`);
         console.log("Dog Engine - Max Uniform Buffers per group: ", device.limits.maxUniformBuffersPerShaderStage);
         console.log("Dog Engine - Max Bind Groups simultaneously: ", device.limits.maxBindGroups); // El mínimo garantizado es 4
 
@@ -280,20 +292,85 @@ const GPUVisibility = Object.freeze({
         }
     }*/
 
-    async function loadConfig(fileName) {
+    /**
+     * Read a file as JSON.
+     * @param {string} fileName Path and name of the file
+     * @returns {JSON Object} The JSON object
+     */
+    async function readFileAsJson(fileName) {
         try {
             // 1. Fetch the file relative to your script location
             const response = await fetch(fileName);
 
             // 2. Direct conversion from file stream to JavaScript object
-            const config = await response.json();
+            const json = await response.json();
 
-            return config;
+            return json;
         } catch (error) {
-            console.error("Could not load configuration:", error);
+            console.error("Could not read the file as JSON:", error);
         }
     }
 
+    /**
+     * Read a file as text.
+     * @param {string} fileName Path and name of the file
+     * @returns {string} The content of the file
+     */
+    async function readFileAsText(fileName) {
+        try {
+            const response = await fetch(fileName);
+
+            return response.text();
+        } catch (error) {
+            console.error("Could not read the file as text:", error);
+        }
+    }
+
+    /**
+     * Create a DogTexture and stores in the resource manager. If the texture already exists in the resource manager, 
+     * increase the number of references and it will be returned.
+     * @param {string} fileName Name/Id of the texture (id of the resource).
+     * @returns {DogTexture} The texture if the creation and stores in the resource manager is ok, null otherwise.
+     */
+    async function createDogTexture(fileName) {
+        let index = fileName.length;
+        while (fileName[index] != "/")
+            index--;
+
+        const name = fileName.substring(index + 1, fileName.length);
+
+        let texture = resourceManager.get(name);
+        if (texture !== undefined && texture != null) {
+            texture.addReference();
+
+            return texture;
+        }
+
+        const response = await fetch(fileName);
+        const imageBitmap = await createImageBitmap(await response.blob());
+
+        let gpuTexture = pGraphics.device.createTexture({
+            label: name,
+            size: [imageBitmap.width, imageBitmap.height, 1],
+            format: 'rgba8unorm',//'bgra8unorm', //'rgba8unorm-srgb', //'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+
+        pGraphics.device.queue.copyExternalImageToTexture(
+            { source: imageBitmap },//, flipY: true },
+            { texture: gpuTexture },
+            [imageBitmap.width, imageBitmap.height]
+        );
+
+        texture = new DogTexture(name);
+        texture.setGPUTexture(gpuTexture);
+        texture.setWidthAndHeight(imageBitmap.width, imageBitmap.height);
+        texture.setFormat(gpuTexture.format);
+
+        resourceManager.add(name, texture);
+
+        return texture;
+    }
 
     return {
         initWebGPU: initWebGPU,
@@ -301,7 +378,9 @@ const GPUVisibility = Object.freeze({
         createBindGroup: createBindGroup,
         createDogBuffer: createDogBuffer,
         readTextFromFile: readTextFromFile,
-        loadConfig: loadConfig
+        readFileAsJson: readFileAsJson,
+        readFileAsText: readFileAsText,
+        createDogTexture: createDogTexture
     }
 
 })
