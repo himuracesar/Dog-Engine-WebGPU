@@ -1,5 +1,3 @@
-//import { STRUCTS_LIGHTS_AND_MATERIAL } from '/DogEngine/pipeline/structs/LightsAndMaterial.js';
-
 /**
  * it implements Phong shading technique
  * 

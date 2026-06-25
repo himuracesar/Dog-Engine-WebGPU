@@ -244,6 +244,8 @@
     <script type="text/javascript" src="/DogEngine/pipeline/GouradShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/PhongShadingPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
+
+    <script type="text/javascript" src="/pipeline/BlinnPhongShadingPipeline.js"></script>
 </head>
 
 <body onload="init();">
@@ -267,12 +269,14 @@
 
         let phongShadingPipeline;
         let gouradShadingPipeline;
+        let blinnPhongShadingPipeline;
         let wireframePipeline;
 
         let camera;
 
         let spherePhong;
         let sphereGourad;
+        let sphereBlinnPhong;
 
         let material = null;
         let directionalLight = null;
@@ -300,6 +304,7 @@
 
             spherePhong = shape.createSphere(descriptor);
             sphereGourad = shape.createSphere(descriptor);
+            sphereBlinnPhong = shape.createSphere(descriptor);
 
             descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
@@ -312,9 +317,10 @@
 
             spherePhong.getTransform().translateAbsolute(0.0, 30.0, 0.0);
             sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
+            sphereBlinnPhong.getTransform().translateAbsolute(-140.0, 30, 0.0);
         }
 
-        function createPipeline() {
+        async function createPipeline() {
             const bglPhong = [
                 resourceManager.getBindGroupLayout(0),
                 resourceManager.getBindGroupLayout(1),
@@ -339,6 +345,14 @@
                 format: 'depth24plus',
                 usage: GPUTextureUsage.RENDER_ATTACHMENT,
             });
+
+            let blinnPhongShaders = [
+                await webGPUengine.readFileAsText("/shaders/Common.wgsl"),
+                await webGPUengine.readFileAsText("/shaders/LightsAndMaterial.wgsl"),
+                await webGPUengine.readFileAsText("/shaders/BlinnPhongShader.wgsl")
+            ];
+
+            blinnPhongShadingPipeline = new BlinnPhongShadingPipeline(bglPhong, blinnPhongShaders);
         }
 
         function createProps() {
@@ -489,7 +503,7 @@
             createShapes();
             createLightsMaterials();
             createProps();
-            createPipeline();
+            await createPipeline();
 
             const jsonLighting = {
                 label: "Lighting Bind Group",
@@ -640,6 +654,7 @@
 
             spherePhong.update(dt);
             sphereGourad.update(dt);
+            sphereBlinnPhong.update(dt);
             grid.update(dt);
         }
 
@@ -684,6 +699,9 @@
 
             pass.setPipeline(gouradShadingPipeline.getWebGPUPipeline());
             sphereGourad.render(pass);
+
+            pass.setPipeline(blinnPhongShadingPipeline.getWebGPUPipeline());
+            sphereBlinnPhong.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props
