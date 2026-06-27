@@ -23,19 +23,20 @@ class DogMaterial extends DogResource {
         this.metallness = 0.0;
         this.fresnel = 0.0;
         this.has_Texture = false;
+        this.bufferSize = 24 * 4;
 
         this.idBuffer = -1;
         this.group = -1;
         this.binding = -1;
         this.idBindGroup = -1;
+        this.bufferOffset = 0;
 
         let idCount = -1;
 
         if (createBuffer) {
             idCount = resourceManager.getCounter();
-            const bufferSize = 24 * 4;
 
-            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial-Buffer" + idCount, BufferType.Data, null, bufferSize, true);
+            this.idBuffer = webGPUengine.createDogBuffer("DogMaterial-Buffer" + idCount, BufferType.Data, null, this.bufferSize, true);
         }
 
         const jsonObj = resourceManager.getGroupAndBinding("DogMaterial");
@@ -193,6 +194,38 @@ class DogMaterial extends DogResource {
      */
     hasTexture() {
         return this.has_Texture;
+    }
+
+    /**
+     * Get the buffer size
+     * @returns {int} buffer size
+     */
+    getBufferSize() {
+        return this.bufferSize;
+    }
+
+    /**
+     * Get the buffer offset
+     * @returns {int} buffer offset
+     */
+    getBufferOffset() {
+        return this.bufferOffset;
+    }
+
+    /**
+     * Set the buffer offset
+     * @param {int} offset buffer offset
+     */
+    setBufferOffset(offset) {
+        this.bufferOffset = offset;
+    }
+
+    /**
+     * Set the ID of the buffer.
+     * @param {int} id ID of the buffer.
+     */
+    setIdBuffer(id) {
+        this.idBuffer = id;
     }
 
     //----------------------- WebGPU's methods -----------------------

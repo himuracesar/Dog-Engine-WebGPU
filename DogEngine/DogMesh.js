@@ -10,8 +10,9 @@ class DogMesh {
      * Create a new DogMesh instance. The constructor initializes the transform, number of 
      * indices and vertices, parent ID, bounding volume, material ID, and local axes (forward, up, right).
      */
-    constructor() {
-        this.transform = new DogTransform();
+    constructor(name = "", createBuffer = true, createBindGroup = true) {
+        this.name = name;
+        this.transform = new DogTransform(createBuffer, createBindGroup);
         this.numIndices = 0;
         this.numVertices = 0;
         this.idParent = -1;
@@ -20,6 +21,9 @@ class DogMesh {
         this.forward = [0.0, 0.0, -1.0, 0.0];
         this.up = [0.0, 1.0, 0.0, 0.0];
         this.right = [1.0, 0.0, 0.0, 0.0];
+        this.firstVertex = 0;
+        this.firstIndex = 0;
+        this.baseVertex = 0;
     }
 
     /**
@@ -45,6 +49,7 @@ class DogMesh {
      * @param {GPUEncoderPass} pass 
      */
     render(pass) {
+        //draw(vertexCount, instanceCount, firstVertex, firstInstance)
         pGraphics.device.queue.writeBuffer(this.transform.getBuffer().getWebGPUBuffer(), 0, this.transform.getTransformMatrix());
 
         let material = resourceManager.get(this.idMaterial);
@@ -55,8 +60,14 @@ class DogMesh {
         }
 
         pass.setBindGroup(this.transform.getGroup(), this.transform.getBindGroup());
-        //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
-        pass.drawIndexed(this.numIndices, 1, 0, 0, 0);
+
+        if (this.numIndices > 0) {
+            //pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
+            pass.drawIndexed(this.numIndices, 1, this.firstIndex, this.baseVertex, 0);
+        } else {
+            //draw(vertexCount, instanceCount, firstVertex, firstInstance)
+            pass.draw(this.numVertices, 1, this.firstVertex, 0);
+        }
     }
 
     /**
@@ -137,5 +148,53 @@ class DogMesh {
      */
     getIdMaterial() {
         return this.idMaterial;
+    }
+
+    /**
+     * Get the material of the mesh.
+     * @returns {DogMaterial} The material of the mesh.
+     */
+    getMaterial() {
+        return resourceManager.get(this.idMaterial);
+    }
+
+    /**
+     * Set the first vertex of the mesh.
+     * @param {int} firstVertex The first vertex of the mesh.
+     */
+    setFirstVertex(firstVertex) {
+        this.firstVertex = firstVertex;
+    }
+
+    /**
+     * Set the first index of the mesh.
+     * @param {int} firstIndex The first index of the mesh.
+     */
+    setFirstIndex(firstIndex) {
+        this.firstIndex = firstIndex;
+    }
+
+    /**
+     * Set the base vertex of the mesh.
+     * @param {int} baseVertex The base vertex of the mesh.
+     */
+    setBaseVertex(baseVertex) {
+        this.baseVertex = baseVertex;
+    }
+
+    /**
+     * Sets the ID of the bind group that contains the transform matrix.
+     * @param {int} idBindGroup The ID of the bind group that contains the transform matrix.
+     */
+    setIdBindGroup(idBindGroup) {
+        this.transform.setIdBindGroup(idBindGroup);
+    }
+
+    /**
+     * Sets the ID of the buffer that contains the transform matrix.
+     * @param {int} idBuffer The ID of the buffer that contains the transform matrix.
+     */
+    setIdBuffer(idBuffer) {
+        this.transform.setIdBuffer(idBuffer);
     }
 }

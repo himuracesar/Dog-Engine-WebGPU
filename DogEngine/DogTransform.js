@@ -34,11 +34,11 @@ class DogTransform {
             this.idBuffer = webGPUengine.createDogBuffer("DogTransform-Buffer" + idCount, BufferType.Data, null, bufferSize, true);
         }
 
-        if (createBindGroup) {
-            const jsonObj = resourceManager.getGroupAndBinding("DogTransform");
-            this.group = jsonObj.group;
-            this.binding = jsonObj.binding;
+        const jsonObj = resourceManager.getGroupAndBinding("DogTransform");
+        this.group = jsonObj.group;
+        this.binding = jsonObj.binding;
 
+        if (createBindGroup) {
             const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
 
             const objLayout = {
@@ -299,5 +299,29 @@ class DogTransform {
      */
     getGroup() {
         return this.group;
+    }
+
+    /**
+     * Sets the ID of the buffer that contains the transform matrix.
+     * @param {int} idBuffer The ID of the buffer that contains the transform matrix.
+     */
+    setIdBuffer(idBuffer) {
+        this.idBuffer = idBuffer;
+    }
+
+    /**
+     * Sets the ID of the bind group that contains the transform matrix.
+     * @param {int} idBindGroup The ID of the bind group that contains the transform matrix.
+     */
+    setIdBindGroup(idBindGroup) {
+        this.idBindGroup = idBindGroup;
+    }
+
+    /**
+     * Sets the group to belong this component in the shaders.
+     * @param {int} group Group
+     */
+    setGroup(group) {
+        this.group = group;
     }
 }
