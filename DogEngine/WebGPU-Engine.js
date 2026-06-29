@@ -242,7 +242,7 @@ const GPUVisibility = Object.freeze({
                 return name;
             }
         } catch (error) {
-            console.log("createDogBuffer:: The resource manager is not initialized." + error);
+            console.log("WebGPU-Engine::createDogBuffer:: The resource manager is not initialized." + error);
         }
 
         const buffer = new DogBuffer(name, type, data, size);
@@ -332,7 +332,7 @@ const GPUVisibility = Object.freeze({
      * @param {string} fileName Name/Id of the texture (id of the resource).
      * @returns {DogTexture} The texture if the creation and stores in the resource manager is ok, null otherwise.
      */
-    async function createDogTexture(fileName) {
+    async function createDogTextureFromImage(fileName) {
         let index = fileName.length;
         while (fileName[index] != "/")
             index--;
@@ -366,10 +366,303 @@ const GPUVisibility = Object.freeze({
         texture.setGPUTexture(gpuTexture);
         texture.setWidthAndHeight(imageBitmap.width, imageBitmap.height);
         texture.setFormat(gpuTexture.format);
+        texture.addReference();
 
         resourceManager.add(name, texture);
 
         return texture;
+    }
+
+    /**
+     * Creates a dummy white texture. Only creates if the dummy texture does not exist in the resource manager.
+     * The size of this texture is 1 pixel.
+     * @returns {DogTexture} The dummy texture.
+     */
+    function createDummyTexture() {
+        let name = "dummy-dog-texture";
+        let texture = resourceManager.get(name);
+        if (texture !== undefined && texture != null) {
+            texture.addReference();
+            return texture;
+        }
+
+        let gpuTexture = pGraphics.device.createTexture({
+            label: name,
+            size: [1, 1, 1],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+
+        pGraphics.device.queue.copyExternalImageToTexture(
+            { source: new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1) },
+            { texture: gpuTexture },
+            [1, 1]
+        );
+
+        texture = new DogTexture(name);
+        texture.setGPUTexture(gpuTexture);
+        texture.setWidthAndHeight(1, 1);
+        texture.setFormat(gpuTexture.format);
+        texture.addReference();
+
+        resourceManager.add(name, texture);
+
+        return texture;
+    }
+
+    /**
+     * Creates a dummy white material. Only creates if the dummy material does not exist in the resource manager.
+     * @param {boolean} createBuffer If the buffer should be created.
+     * @param {boolean} createBindGroup If the bind group should be created.
+     * @returns {DogMaterial} The dummy material.
+     */
+    function createDefaultMaterial(name, createBuffer = true, createBindGroup = true) {
+        let material = resourceManager.get(name);
+        if (material !== undefined && material != null) {
+            material.addReference();
+
+            return material;
+        }
+
+        material = new DogMaterial(name, createBuffer, createBindGroup);
+        material.setDiffuseColor([0.7, 0.7, 0.7, 1.0]);
+        material.setSpecularColor([0.5, 0.5, 0.5, 1.0]);
+        material.setAmbientColor([0.2, 0.2, 0.2, 1.0]);
+        material.setEmissiveColor([0.0, 0.0, 0.0, 1.0]);
+        material.setSpecularPower(20.0);
+        material.setTransparency(1.0);
+        material.setOpticalDensity(0.0)
+        material.setRoughness(0.5)
+        material.setMetallness(0.5)
+        material.setHasTexture(false)
+        material.setFresnel(0.0)
+        material.addReference();
+
+        resourceManager.add(name, material);
+
+        return material;
+    }
+
+    /**
+     * Create a DogSampler and stores in the resource manager. If the sampler already exists in the resource manager, 
+     * increase the number of references and it will be returned.
+     * @param {string} name Name/Id of the sampler (id of the resource).
+     * @param {object} config Configuration of the sampler. 
+     *                      The configuration object has the following properties:
+     * @param config.addressModeU {string} Address mode for the U coordinate. (default: "")
+     * @param config.addressModeV {string} Address mode for the V coordinate. (default: "")
+     * @param config.magFilter {string} Magnification filter. (default: "")
+     * @param config.minFilter {string} Minification filter. (default: "")
+     * @param config.mipmapFilter {string} Mipmap filter. (default: "")
+     * @returns {DogSampler} The sampler if the creation and stores in the resource manager is ok, null otherwise.
+     */
+    function createDogSampler(name, config = {}) {
+        const amu = config.addressModeU || "";
+        const amv = config.addressModeV || "";
+        const maf = config.magFilter || "";
+        const mif = config.minFilter || "";
+        const mm = config.mipmapFilter || "";
+
+        if (name === undefined || name == null || name == "") {
+            name = "amu-" + amu.substring(0, 2) +
+                "amv-" + amv.substring(0, 2) +
+                "maf-" + maf.substring(0, 2) +
+                "mif-" + mif.substring(0, 2) +
+                "mm-" + mm.substring(0, 2);
+        }
+
+        if (resourceManager.get(name) !== undefined && resourceManager.get(name) !== null) {
+            const sampler = resourceManager.get(name);
+            sampler.addReference();
+
+            return sampler;
+        }
+
+        const sampler = new DogSampler(name, config);
+        sampler.addReference();
+
+        resourceManager.add(name, sampler);
+
+        return sampler;
+    }
+
+    /**
+     * Creates a new static mesh from an OBJ file. The MTL file must be in the same directory.
+     * @param {string} fileName The path to the OBJ file.
+     * @returns {Promise<DogStaticMesh>} The static mesh if the creation and stores in the resource manager is ok, null otherwise.
+     */
+    async function createMeshByObjFile(fileName) {
+        let text = await readFileAsText(fileName);
+        let obj = await parseOBJ(text);
+
+        let staticMesh = new DogStaticMesh();
+
+        /** Load Materials */
+        let basePath = "";
+        let index = fileName.length;
+        while (fileName[index] != "/")
+            index--;
+
+        basePath = fileName.substring(0, index + 1);
+        let name = fileName.substring(index + 1, fileName.length);
+
+        let materials = [];
+        for (let i = 0; i < obj.materialLibs.length; i++) {
+            let response = await fetch(basePath + obj.materialLibs[i]);
+            let text = await response.text();
+            materials = parseLib(text);
+        }
+
+        let lenMaterials = Object.keys(materials).length;
+        if (lenMaterials == 0) {
+            lenMaterials = 1;
+        }
+
+        const bufferSizeMaterial = 24 * 4 * lenMaterials;
+        let idBufferMaterial = createDogBuffer(name + "-buffer-material", BufferType.Data, null, bufferSizeMaterial, true);
+
+        let iMaterial = 0;
+        for (let m in materials) {
+            const mat = materials[m];
+
+            let material = new DogMaterial(m.toString(), false, false);
+            material.setAmbientColor([mat.Ka[0], mat.Ka[1], mat.Ka[2], 1.0]);
+            material.setDiffuseColor([mat.Kd[0], mat.Kd[1], mat.Kd[2], 1.0]);
+            material.setSpecularColor([mat.Ks[0], mat.Ks[1], mat.Ks[2], 1.0]);
+            material.setEmissiveColor([mat.Ke[0], mat.Ke[1], mat.Ke[2], 1.0]);
+            material.setTransparency(mat.d);
+            material.setSpecularPower(mat.Ns);
+            material.setOpticalDensity(mat.Ni);
+            material.setIdBuffer(idBufferMaterial);
+            material.setBufferOffset(24 * 4 * iMaterial++);
+
+            let texture = null;
+            if (mat.map_Kd !== undefined && mat.map_Kd != "") {
+                texture = await createDogTextureFromImage(basePath + mat.map_Kd);
+            } else {
+                texture = createDummyTexture();
+            }
+
+            material.setDiffuseTextureIndex(texture.getName());
+            material.setHasTexture(true);
+
+            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+            texture.setIdSampler(sampler.getName());
+
+            const jsonMaterial = {
+                label: "Material Bind Group",
+                layout: resourceManager.getBindGroupLayout(2),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: { buffer: material.getBuffer().getWebGPUBuffer() }
+                    },
+                    {
+                        binding: 1,
+                        resource: texture.getGPUTextureView()
+                    },
+                    {
+                        binding: 2,
+                        resource: sampler.getGPUSampler()
+                    }
+                ]
+            };
+
+            let idBindGroupMaterial = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMaterial);
+
+            material.setIdBindGroup(idBindGroupMaterial);
+
+            resourceManager.add(material.getName(), material);
+        }
+
+        let nameMaterial = name + "-default-material";
+        if (iMaterial == 0) {
+            let texture = createDummyTexture();
+
+            let material = createDefaultMaterial(nameMaterial, false, false);
+            material.setIdBuffer(idBufferMaterial);
+
+            material.setDiffuseTextureIndex(texture.getName());
+            material.setHasTexture(true);
+
+            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+            texture.setIdSampler(sampler.getName());
+
+            const jsonMaterial = {
+                label: "Material Bind Group",
+                layout: resourceManager.getBindGroupLayout(2),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: { buffer: material.getBuffer().getWebGPUBuffer() }
+                    },
+                    {
+                        binding: 1,
+                        resource: texture.getGPUTextureView()
+                    },
+                    {
+                        binding: 2,
+                        resource: sampler.getGPUSampler()
+                    }
+                ]
+            };
+
+            let idBindGroupMaterial = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMaterial);
+
+            material.setIdBindGroup(idBindGroupMaterial);
+        }
+
+        /** Load geometry */
+        const bufferSizeMeshes = 16 * 4 * obj.geometries.length;
+        let idBufferMeshes = createDogBuffer(name + "-buffer-meshes", BufferType.Data, null, bufferSizeMeshes, true);
+
+        const jsonMeshes = {
+            label: "Meshes Bind Group",
+            layout: resourceManager.getBindGroupLayout(3),
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: resourceManager.get(idBufferMeshes).getWebGPUBuffer() }
+                }
+            ]
+        };
+
+        let idBindGroupMeshes = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMeshes);
+
+        let vertices = [];
+        for (let i = 0; i < obj.geometries.length; i++) {
+            let numVertices = obj.geometries[i].data.position.length / 3;
+            let baseVertex = (vertices.length > 0) ? vertices.length / 8 : 0;
+            let iTex = 0;
+
+            for (let j = 0; j < obj.geometries[i].data.position.length; j += 3) {
+                vertices.push(obj.geometries[i].data.position[j]);
+                vertices.push(obj.geometries[i].data.position[j + 1]);
+                vertices.push(obj.geometries[i].data.position[j + 2]);
+                vertices.push(obj.geometries[i].data.normal[j]);
+                vertices.push(obj.geometries[i].data.normal[j + 1]);
+                vertices.push(obj.geometries[i].data.normal[j + 2]);
+                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+            }
+
+            let mesh = new DogMesh(obj.geometries[i].object, false, false);
+            mesh.setNumVertices(numVertices);
+            mesh.setBaseVertex(baseVertex);
+            mesh.setFirstVertex(baseVertex);
+            mesh.setIdMaterial(iMaterial == 0 ? nameMaterial : obj.geometries[i].material);
+            mesh.setIdBuffer(idBufferMeshes);
+            mesh.setIdBindGroup(idBindGroupMeshes);
+            //submesh.setBoundingVolume(bounding);
+
+            staticMesh.addMesh(mesh);
+        }
+
+        webGPUengine.createDogBuffer("Vb-" + name, BufferType.Vertex, new Float32Array(vertices), 0, true);
+
+        staticMesh.setIdVertexBuffer("Vb-" + name);
+
+        return staticMesh;
     }
 
     return {
@@ -380,7 +673,11 @@ const GPUVisibility = Object.freeze({
         readTextFromFile: readTextFromFile,
         readFileAsJson: readFileAsJson,
         readFileAsText: readFileAsText,
-        createDogTexture: createDogTexture
+        createDogTextureFromImage: createDogTextureFromImage,
+        createDummyTexture: createDummyTexture,
+        createDogSampler: createDogSampler,
+        createDefaultMaterial: createDefaultMaterial,
+        createMeshByObjFile: createMeshByObjFile
     }
 
 })

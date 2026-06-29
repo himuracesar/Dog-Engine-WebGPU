@@ -1,13 +1,13 @@
 /**
- * it implements Blinn-Phong shading technique
+ * it implements Texture shading technique
  * 
  * @author César Himura
  * @version 1.0
  */
-class BlinnPhongShadingPipeline extends DogPipeline {
+class TextureShadingPipeline extends DogPipeline {
 
     /**
-     * Creates a new Blinn-PhongShadingPipeline instance.
+     * Creates a new TextureShadingPipeline instance.
      * @param {GPUBindGroupLayout[]} bindGroupLayouts List of bind group layouts to be used in the pipeline.
      */
     constructor(bindGroupLayouts = [], shaders = []) {
@@ -15,11 +15,8 @@ class BlinnPhongShadingPipeline extends DogPipeline {
             // Common
             ${shaders[0]} 
 
-            // Lights and Materials
+            // Texture Shader
             ${shaders[1]} 
-
-            // Blinn-Phong Shader
-            ${shaders[2]} 
         `;
 
         let vertexLayout = { "position": 3, "normal": 3, "texCoord": 2 };
@@ -29,6 +26,6 @@ class BlinnPhongShadingPipeline extends DogPipeline {
             bindGroupLayouts: bindGroupLayouts
         };
 
-        super("Blin-Phong-Textures-Shading", shader, descriptor);
+        super("Texture-Shading", shader, descriptor);
     }
 }

@@ -520,8 +520,8 @@
 
             //------------------------------ Texture -------------------------------------
 
-            let texture = await webGPUengine.createDogTexture("/images/Huella.jpg");
-            let sampler = new DogSampler({ magFilter: 'linear', minFilter: 'linear' });
+            let texture = await webGPUengine.createDogTextureFromImage("/images/Huella.jpg");
+            let sampler = new DogSampler("", { magFilter: 'linear', minFilter: 'linear' });
 
             material.setDiffuseTextureIndex(texture.getName());
             texture.setIdSampler(sampler.getName());

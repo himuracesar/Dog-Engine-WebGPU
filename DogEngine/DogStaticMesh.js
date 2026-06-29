@@ -1,9 +1,7 @@
 class DogStaticMesh {
     constructor() {
-        this.transform = new DogTransform();
+        this.transform = new DogTransform(false, false);
         this.meshes = [];
-        this.vertexBase = 0;
-        this.indexBase = 0;
         this.boundingVolume = null;
         this.idVertexBuffer = null;
         this.idIndexBuffer = null;
@@ -30,7 +28,10 @@ class DogStaticMesh {
 
     render(pass) {
         pass.setVertexBuffer(0, resourceManager.get(this.idVertexBuffer).getWebGPUBuffer());
-        pass.setIndexBuffer(resourceManager.get(this.idIndexBuffer).getWebGPUBuffer(), 'uint16');
+
+        if (this.idIndexBuffer !== null && this.idIndexBuffer !== "") {
+            pass.setIndexBuffer(resourceManager.get(this.idIndexBuffer).getWebGPUBuffer(), 'uint16');
+        }
 
         for (var i = 0; i < this.meshes.length; i++) {
             this.meshes[i].render(pass);
@@ -76,5 +77,22 @@ class DogStaticMesh {
      */
     setMaterial(idMesh, idMaterial) {
         this.meshes[idMesh].setIdMaterial(idMaterial);
+    }
+
+    /**
+     * Get the material of a mesh.
+     * @param {int} idMesh The ID of the mesh.
+     * @returns {DogMaterial} The material of the mesh.
+     */
+    getMaterial(idMesh) {
+        return this.meshes[idMesh].getMaterial();
+    }
+
+    /**
+     * Gets the number of meshes in the static mesh.
+     * @returns {int} The number of meshes in the static mesh.
+     */
+    getNumMeshes() {
+        return this.meshes.length;
     }
 }

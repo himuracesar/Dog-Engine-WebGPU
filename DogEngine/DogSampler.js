@@ -13,23 +13,7 @@ class DogSampler extends DogResource {
      * @param {string} config.minFilter Minification filter.
      * @param {string} config.mipmapFilter Mipmap filter.
      */
-    constructor(config = {}) {
-        const amu = config.addressModeU || "";
-        const amv = config.addressModeV || "";
-        const maf = config.magFilter || "";
-        const mif = config.minFilter || "";
-        const mm = config.mipmapFilter || "";
-
-        let name = ""
-        if (config.name === undefined)
-            name = "amu-" + amu.substring(0, 2) +
-                "amv-" + amv.substring(0, 2) +
-                "maf-" + maf.substring(0, 2) +
-                "mif-" + mif.substring(0, 2) +
-                "mm-" + mm.substring(0, 2);
-        else
-            name = config.name;
-
+    constructor(name, config = {}) {
         super(name);
 
         this.name = name;
