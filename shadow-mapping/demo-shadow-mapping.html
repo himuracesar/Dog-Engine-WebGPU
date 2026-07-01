@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dog WebGPU - Demo Procedural Meshes</title>
+    <title>Dog Engine WebGPU - Demo Shadow Mapping</title>
 
     <style>
         :root {
@@ -91,17 +91,25 @@
     </style>
 
     <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
-    <link rel="icon" href="/DogEngine/ico/Triangle_icon.png" type="image/png">
+    <link rel="icon" href="/DogEngine/ico/Dog.png" type="image/png">
 
     <script>
         // Global state for the performance monitor
-        var performanceState = {
+        let performanceState = {
             fps: 0.0
         };
         // Global state for the configuration parameters
-        var configState = {
+        let configState = {
             background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
         };
+
+        let directionalLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            direction: { x: 1.0, y: -1.0, z: -1.0 },
+            enabled: true,
+            intensity: 1.0
+        };
+
     </script>
 
     <script type="module">
@@ -120,10 +128,23 @@
         const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
         paneConfig.addBinding(configState, 'background', { color: { type: 'float' } }).on('change', emitUI);
 
+        // --- Widget 3: Lights  ---
+        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights' });
+        const directionalLightFolder = paneLights.addFolder({
+            title: 'Directional Light',
+            expanded: false,   // optional
+        });
+
+        directionalLightFolder.addBinding(directionalLightState, 'color', { color: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1 }).on('change', emitUI);
+
         // Send data to the engine
         function emitUI() {
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
         }
 
         // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
@@ -131,19 +152,30 @@
             panePerformance.refresh();
         }, 100);
 
+        window.addEventListener(EVT_INIT, (e) => {
+            paneLights.refresh();
+        });
+
         // Emit initial state
         emitUI();
     </script>
 
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
     <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogScreen.js"></script>
 
     <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
     <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
     <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogDirectionalLight.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
-    <script type="text/javascript" src="/DogEngine/pipeline/NormalColorPipeline.js"></script>
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/ScreenPipeline.js"></script>
+
+    <script type="text/javascript" src="/helpers.js"></script>
+
+    <script type="text/javascript" src="/shadow-mapping/pipeline/GeneralPipeline.js"></script>
+    <script type="text/javascript" src="/shadow-mapping/pipeline/ShadowMapPipeline.js"></script>
 </head>
 
 <body onload="init();">
@@ -162,52 +194,40 @@
         /******* Events' names for clean communication *******/
         const EVT_DATA = 'engine-data-update';
         const EVT_UI = 'ui-params-change';
+        const EVT_INIT = 'engine-init';
+        //***************************************************
 
-        var angle = 0.0;
+        let wireframePipeline;
+        let phongShadingPipeline;
+        let shadowMapPipeline;
 
-        var normalColorPipeline;
-        var wireframePipeline;
+        let camera;
 
-        var camera;
+        let bindGroupLayouts;
 
-        var cube;
-        var sphere;
-        var grid;
-        var cylinder;
-        var torus;
-        var cube2;
-        var cornellBox;
+        let depthTexture;
+        let dummyTexture;
+        let shadowMap;
 
-        var scalingFactor = 0.01;
+        let propsBindGroup;
+        let propsBindGroupLayout;
 
-        var bindGroupLayouts;
+        let dragon;
+        let grid
+        let cornellBox;
 
-        var depthTexture;
+        let directionalLight;
 
-        var propsBindGroup;
-        var propsBindGroupLayout;
+        let screenShadowMap;
+
+        let shadowPassDescriptor;
+        let renderPassDescriptor;
 
         //------------------- Demo's main functions -------------------
-        function createShapes() {
+        async function createShapes() {
             const shape = new DogShape();
 
-            var descriptor = {};
-            descriptor.width = 50.0;
-            descriptor.height = 50.0;
-            descriptor.depth = 50.0;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
-
-            cube = shape.createCube(descriptor);
-
-            descriptor = {};
-            descriptor.radio = 25.0;
-            descriptor.slices = 20;
-            descriptor.stacks = 20;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Sphere;
-
-            sphere = shape.createSphere(descriptor);
-
-            descriptor = {};
+            let descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
             descriptor.numVertRows = 50;
             descriptor.numVertCols = 50;
@@ -216,52 +236,55 @@
 
             grid = shape.createGrid(descriptor);
 
-            descriptor = {};
-            descriptor.slices = 10;
-            descriptor.stacks = 10;
-            descriptor.bottomRadio = 20.0;
-            descriptor.topRadio = 20.0;
-            descriptor.height = 100.0;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
+            cornellBox = shape.createCornellBox();
 
-            cylinder = shape.createCylinder(descriptor);
-
-            descriptor = {};
-            descriptor.radio = 30.0;
-            descriptor.tuberadio = 10.0;
-            descriptor.radialSegments = 32;
-            descriptor.tubularSegments = 16;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
-
-            torus = shape.createTorus(descriptor);
-
-            descriptor = {};
-            descriptor.width = 50.0;
-            descriptor.height = 50.0;
-            descriptor.depth = 50.0;
-            cube2 = shape.createCube(descriptor);
-
-            descriptor = {};
-            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
-
-            sphere.getTransform().translateAbsolute(100.0, 25.0, 0.0);
-            cube.getTransform().translateAbsolute(0.0, 25.0, 0.0);
-            cylinder.getTransform().translateAbsolute(-100.0, 50.0, 0.0);
-            torus.getTransform().translateAbsolute(0.0, 25.0, -100.0);
-            cube2.getTransform().translateAbsolute(0.0, 120.0, 0.0);
+            /*dragon = await webGPUengine.createMeshByObjFile("/resources/models/dragon_standford.obj");
+            dragon.getTransform().translateAbsolute(0.0, 50.0, 0.0);
+            dragon.getTransform().scaleAbsolute(100.0, 100.0, 100.0);
+            dragon.getTransform().rotateAbsolute(0.0, 90.0, 0.0);*/
         }
 
-        function createPipeline() {
-            var bgl = [
-                resourceManager.getBindGroupLayout(0),
-                undefined, // Bind group 1 is not used in this demo
-                undefined, // Bind group 2 is set dynamically during rendering
-                resourceManager.getBindGroupLayout(3)
-            ];
+        /**
+         * Configures the Cornell Box. Adding and asigning the materials to each plane.
+         */
+        function configCornellBox() {
+            let m_red = new DogMaterial("m_red", true, false);
+            m_red.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
+            m_red.setAmbientColor([0.1, 0.0, 0.0, 1.0]);
 
-            normalColorPipeline = new NormalColorPipeline(bgl);
+            let m_white = new DogMaterial("m_white", true, false);
+            m_white.setDiffuseColor([1.0, 1.0, 1.0, 1.0]);
+            m_white.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
 
-            bgl = [
+            let m_green = new DogMaterial("m_green", true, false);
+            m_green.setDiffuseColor([0.0, 1.0, 0.0, 1.0]);
+            m_green.setAmbientColor([0.0, 0.1, 0.0, 1.0]);
+
+            resourceManager.add("m_red", m_red);
+            resourceManager.add("m_white", m_white);
+            resourceManager.add("m_green", m_green);
+
+            let texture = webGPUengine.createDummyTexture();
+            let sampler = new DogSampler("", { magFilter: 'linear', minFilter: 'linear' });
+
+            cornellBox.setMaterial(3, m_red.getId());
+            cornellBox.setMaterial(4, m_green.getId());
+            cornellBox.setMaterial(0, m_white.getId());
+            cornellBox.setMaterial(1, m_white.getId());
+            cornellBox.setMaterial(2, m_white.getId());
+            cornellBox.setMaterial(5, m_white.getId());
+
+            let idBindGroup = createBGMateralTexSamp(m_red, texture, sampler);
+            idBindGroup = createBGMateralTexSamp(m_white, texture, sampler);
+            idBindGroup = createBGMateralTexSamp(m_green, texture, sampler);
+        }
+
+        function createLightsAndMaterials() {
+            directionalLight = new DogDirectionalLight();
+        }
+
+        async function createPipeline() {
+            let bgl = [
                 resourceManager.getBindGroupLayout(0),
                 undefined, // Bind group 1 is not used in this demo
                 propsBindGroupLayout,
@@ -270,11 +293,33 @@
 
             wireframePipeline = new WireframePipeline(bgl);
 
-            depthTexture = pGraphics.device.createTexture({
-                size: [canvas.width, canvas.height],
-                format: 'depth24plus',
-                usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            });
+            bgl = [
+                resourceManager.getBindGroupLayout(0),
+                resourceManager.getBindGroupLayout(1),
+                resourceManager.getBindGroupLayout(2),
+                resourceManager.getBindGroupLayout(3)
+            ];
+
+            let phongShadingShaders = [
+                await webGPUengine.readFileAsText("/shaders/Common.wgsl"),
+                await webGPUengine.readFileAsText("/shaders/LightsAndMaterial.wgsl"),
+                await webGPUengine.readFileAsText("/shadow-mapping/shaders/PhongShader.wgsl")
+            ];
+
+            phongShadingPipeline = new GeneralPipeline("Phong-Shading-", bgl, phongShadingShaders);
+
+            let shadowMapShaders = [
+                await webGPUengine.readFileAsText("/shadow-mapping/shaders/ShadowMapShader.wgsl")
+            ];
+
+            bgl = [
+                resourceManager.getBindGroupLayout(0),
+                undefined, // Bind group 1 is not used in this demo
+                undefined, // Bind group 2 is not used in this demo
+                resourceManager.getBindGroupLayout(3)
+            ];
+
+            shadowMapPipeline = new ShadowMapPipeline("ShadowMap-", bgl, shadowMapShaders);
         }
 
         function createProps() {
@@ -309,6 +354,76 @@
             });
         }
 
+        function createRenderTargets() {
+            depthTexture = webGPUengine.createDogTexture("depthTexture", {
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+
+            shadowMap = webGPUengine.createDogTexture("shadowMap", {
+                size: [1024, 1024, 1],
+                usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+                format: 'depth32float'
+            });
+
+            // GPURenderPassDescriptor
+            shadowPassDescriptor = {
+                colorAttachments: [],
+                depthStencilAttachment: {
+                    view: shadowMap.getGPUTextureView(),
+                    depthClearValue: 1.0,
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                },
+            };
+
+            // GPURenderPassDescriptor
+            renderPassDescriptor = {
+                colorAttachments: [
+                    {
+                        // view is acquired and set in render loop.
+                        view: undefined,
+
+                        clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a },
+                        loadOp: 'clear',
+                        storeOp: 'store',
+                    },
+                ],
+                depthStencilAttachment: {
+                    view: depthTexture.getGPUTextureView(),
+
+                    depthClearValue: 1.0,
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                    /*stencilClearValue: 0,
+                    stencilLoadOp: 'clear',
+                    stencilStoreOp: 'store',*/
+                },
+            };
+        }
+
+        function createShadows() {
+            const LIGHT_FRUSTUM_SIZE = 700.0;
+
+            lightPosition = [-600.0, 1000.0, -600.0];
+            lightLookAt = [0.0, 0.0, 0.0];
+            lightUp = [0.0, 1.0, 0.0];
+
+            let lightViewMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.lookAt(lightViewMatrix, lightPosition, lightLookAt, lightUp);
+
+            let lightProjectionMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.ortho(
+                lightProjectionMatrix, -LIGHT_FRUSTUM_SIZE,
+                LIGHT_FRUSTUM_SIZE, -LIGHT_FRUSTUM_SIZE,
+                LIGHT_FRUSTUM_SIZE, 0.1,
+                LIGHT_FRUSTUM_SIZE * 2.0
+            );
+
+            debugger;
+        }
+
         //------------------ End demo's main functons -----------------
 
         /**
@@ -325,18 +440,29 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.readFileAsJson("/DogEngine/config/camera-mesh-scene.json");
+            let configScene = await webGPUengine.readFileAsJson("/shadow-mapping/config/camera-dl-material-mesh.json");
 
             webGPUengine.createBindGroupLayouts(configScene);
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 100.0]);
-            camera.setSpeed(2.3);
+            camera.setSpeed(5.3);
             camera.setFarPlane(4000.0);
 
-            createShapes();
+            createRenderTargets();
+            await createShapes();
             createProps();
-            createPipeline();
+            await createPipeline();
+            configCornellBox();
+            createLightsAndMaterials();
+            createShadows();
+
+            dummyTexture = webGPUengine.createDummyTexture();
+
+            screenShadowMap = new DogScreen("ScreenShadowMap", 100, 100);
+            screenShadowMap.setPosition([10.0, 10.0, 0.0]);
+
+            screenShadowMap.setTexture(dummyTexture.getGPUTextureView());
 
             requestAnimationFrame(updateAndRender);
         }
@@ -430,23 +556,19 @@
 
             input();
 
-            angle += dt * 0.075;
-            angle = angle % 360;
+            //--------------- update lights and materials from the UI state ---------------
+            directionalLight.setDirection([directionalLightState.direction.x, directionalLightState.direction.y, directionalLightState.direction.z, 0.0]);
+            directionalLight.setColor([directionalLightState.color.r, directionalLightState.color.g, directionalLightState.color.b, directionalLightState.color.a]);
+            directionalLight.setEnabled(directionalLightState.enabled);
+            directionalLight.setIntensity(directionalLightState.intensity);
+            //--------------- end update lights and materials from the UI state ---------------
 
-            cube2.getTransform().rotateAbsolute(glMatrix.glMatrix.toRadian(angle), glMatrix.glMatrix.toRadian(angle), 0.0);
-            var scale = cube2.getTransform().getScale()[0];
-            if (scale < 0.5 || cube2.getTransform().getScale()[0] > 3.0)
-                scalingFactor = -scalingFactor;
+            //dragon.update(dt);
+            cornellBox.update(dt);
 
-            scale += scalingFactor;
-            cube2.getTransform().scaleAbsolute(scale, scale, scale);
-
-            cube.update(dt);
-            sphere.update(dt);
             grid.update(dt);
-            cylinder.update(dt);
-            torus.update(dt);
-            cube2.update(dt);
+
+            screenShadowMap.update();
         }
 
         /**
@@ -454,7 +576,7 @@
          */
         function render() {
             // Rendering logic goes here (e.g., issuing draw calls)
-            const encoder = pGraphics.device.createCommandEncoder();
+            /*const encoder = pGraphics.device.createCommandEncoder();
             const pass = encoder.beginRenderPass({
                 colorAttachments: [{
                     view: pGraphics.context.getCurrentTexture().createView(),
@@ -464,37 +586,59 @@
                 }],
 
                 depthStencilAttachment: {
-                    view: depthTexture.createView(),
+                    view: depthTexture.getGPUTextureView(),
                     depthClearValue: 1.0, // 1.0 is the farthest point
                     depthLoadOp: 'clear',
                     depthStoreOp: 'store',
                 }
-            });
+            });*/
 
-            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            renderPassDescriptor.colorAttachments[0].view = pGraphics.context.getCurrentTexture().createView();
+
+            const commandEncoder = pGraphics.device.createCommandEncoder();
+            {
+                pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+                pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+                pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
+
+                const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
+
+                renderPass.setBindGroup(camera.getGroup(), camera.getBindGroup());
+                renderPass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
+
+                renderPass.setPipeline(wireframePipeline.getWebGPUPipeline());
+                renderPass.setBindGroup(2, propsBindGroup); // Bind group para Props
+                grid.render(renderPass);
+
+                renderPass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
+                //dragon.render(pass);
+                cornellBox.render(renderPass);
+
+                screenShadowMap.render(renderPass);
+
+                renderPass.end();
+            }
+
+            /*pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+            pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
 
-            /*pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(bindGroups.get("DogCamera").buffer, 16 * 4, camera.getProjectionMatrix());*/
-
-            pass.setPipeline(normalColorPipeline.getWebGPUPipeline());
             pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-            pass.setBindGroup(2, null);
-
-            cube.render(pass);
-            sphere.render(pass);
-            cylinder.render(pass);
-            torus.render(pass);
-            cube2.render(pass);
+            pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props
             grid.render(pass);
 
-            pass.end();
+            pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
+            //dragon.render(pass);
+            cornellBox.render(pass);
 
-            const commandBuffer = encoder.finish();
+            screenShadowMap.render(pass);
 
+            pass.end();*/
+
+            const commandBuffer = commandEncoder.finish();
 
             // Finish the command buffer and immediately submit it.
             pGraphics.device.queue.submit([commandBuffer]);

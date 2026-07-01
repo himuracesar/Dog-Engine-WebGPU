@@ -30,7 +30,6 @@ include("/DogEngine/DogMaterial.js");
 include("/DogEngine/DogTransform.js");
 include("/DogEngine/DogMesh.js");
 
-
 include("/DogEngine/DogResourceManager.js");
 include("/DogEngine/bounding/DogBoundingVolume.js");
 include("/DogEngine/bounding/DogBoundingSphere.js");
@@ -198,6 +197,8 @@ const GPUVisibility = Object.freeze({
             let bindGroupLayout = pGraphics.device.createBindGroupLayout(descriptor);
             resourceManager.addBindGroupLayout(group, bindGroupLayout);
         }
+
+        return parsed;
     }
 
     /**
@@ -257,6 +258,8 @@ const GPUVisibility = Object.freeze({
 
                 return "-1";
             }
+        } else {
+            return buffer;
         }
 
         return name;
@@ -411,6 +414,31 @@ const GPUVisibility = Object.freeze({
     }
 
     /**
+     * Creates a dog texture.
+     * @param {string} name Name/Id of the texture (id of the resource).
+     * @param {GPUTextureDescriptor} descriptor The descriptor of the texture.
+     * @returns {DogTexture} The texture.
+     */
+    function createDogTexture(name, descriptor) {
+        const gpuTexture = pGraphics.device.createTexture({
+            label: name,
+            size: descriptor.size,
+            format: descriptor.format,
+            usage: descriptor.usage,
+        });
+
+        const texture = new DogTexture(name);
+        texture.setGPUTexture(gpuTexture);
+        texture.setWidthAndHeight(descriptor.size[0], descriptor.size[1]);
+        texture.setFormat(descriptor.format);
+        texture.addReference();
+
+        resourceManager.add(name, texture);
+
+        return texture;
+    }
+
+    /**
      * Creates a dummy white material. Only creates if the dummy material does not exist in the resource manager.
      * @param {boolean} createBuffer If the buffer should be created.
      * @param {boolean} createBindGroup If the bind group should be created.
@@ -489,7 +517,7 @@ const GPUVisibility = Object.freeze({
     /**
      * Creates a new static mesh from an OBJ file. The MTL file must be in the same directory.
      * @param {string} fileName The path to the OBJ file.
-     * @returns {Promise<DogStaticMesh>} The static mesh if the creation and stores in the resource manager is ok, null otherwise.
+     * @returns {DogStaticMesh} The static mesh if the creation and stores in the resource manager is ok, null otherwise.
      */
     async function createMeshByObjFile(fileName) {
         let text = await readFileAsText(fileName);
@@ -642,8 +670,14 @@ const GPUVisibility = Object.freeze({
                 vertices.push(obj.geometries[i].data.normal[j]);
                 vertices.push(obj.geometries[i].data.normal[j + 1]);
                 vertices.push(obj.geometries[i].data.normal[j + 2]);
-                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
-                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+
+                if (obj.geometries[i].data.texcoord !== undefined && obj.geometries[i].data.texcoord != null) {
+                    vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+                    vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+                } else {
+                    vertices.push(0.0);
+                    vertices.push(0.0);
+                }
             }
 
             let mesh = new DogMesh(obj.geometries[i].object, false, false);
@@ -665,9 +699,58 @@ const GPUVisibility = Object.freeze({
         return staticMesh;
     }
 
+    /**
+     * Create a shader module from the provided shader source code.
+     * @param {string} shaderSource Source of vextex and fragment shaders in WGSL.
+     * @returns {GPUShaderModule} Shader module created from the provided source code.
+     */
+    function createShaderModule(name, shaderSource) {
+        const shaderModule = pGraphics.device.createShaderModule({
+            label: name,
+            code: shaderSource
+        });
+
+        return shaderModule;
+    }
+
+    /**
+     * Create a vertex buffer layout based on the provided vertex layout definition.
+     * @param {GPUVertexBufferLayout} vertexLayout Layout definition for the vertex buffer, 
+     * where each key is an attribute name and value is an object with a 'size' property indicating 
+     * the number of components (e.g., { position: { size: 3 }, color: { size: 4 } }).
+     * @returns {GPUVertexBufferLayout} Vertex buffer layout compatible with WebGPU pipeline creation.
+     */
+    function createVertexBufferLayout(vertexLayout) {
+        var attributes = [];
+        var offset = 0;
+        var location = 0;
+        var stride = 0;
+
+        for (const [key, value] of Object.entries(vertexLayout)) {
+            //console.log(`${key}: ${value}`);
+            attributes.push({
+                format: "float32x" + value,
+                offset: offset,
+                shaderLocation: location
+            });
+
+            location++;
+            offset += value * 4; // offset in bytes (value * 4 bytes per float)
+            stride += value;
+        }
+
+        const vertexBufferLayout = {
+            arrayStride: stride * 4, // stride * 4 bytes per float
+            attributes: attributes,
+        };
+
+        return vertexBufferLayout;
+    }
+
     return {
         initWebGPU: initWebGPU,
         createBindGroupLayouts: createBindGroupLayouts,
+        parseBindGroupLayouts: parseBindGroupLayouts,
         createBindGroup: createBindGroup,
         createDogBuffer: createDogBuffer,
         readTextFromFile: readTextFromFile,
@@ -675,9 +758,12 @@ const GPUVisibility = Object.freeze({
         readFileAsText: readFileAsText,
         createDogTextureFromImage: createDogTextureFromImage,
         createDummyTexture: createDummyTexture,
+        createDogTexture: createDogTexture,
         createDogSampler: createDogSampler,
         createDefaultMaterial: createDefaultMaterial,
-        createMeshByObjFile: createMeshByObjFile
+        createMeshByObjFile: createMeshByObjFile,
+        createShaderModule: createShaderModule,
+        createVertexBufferLayout: createVertexBufferLayout
     }
 
 })

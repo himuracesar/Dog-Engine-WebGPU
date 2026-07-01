@@ -774,4 +774,163 @@ class DogShape {
 
         return staticMesh;
     }
+
+    /**
+     * Create a Cornell Box mesh with standard dimensions.
+     * @param {JSON object} descriptor - Descriptor of the Cornell Box.
+     * @param {DogBoundingVolumeEnums.Type} descriptor.BoundingVolumeType Type of bounding volume to create for the meshes.
+     * @returns {DogStaticMesh} Cornell Box with vertex format { position: 3, normal: 3, texture coords: 2 }
+     */
+    createCornellBox(descriptor = {}) {
+        const idVb = "DogCornellBoxVB";
+        const idIb = "DogCornellBoxIB";
+
+        var resource = null;
+
+        try {
+            resource = resourceManager.get(idVb);
+            resource.addReference();
+        } catch (error) {
+            resource = null;
+        }
+
+        const numMeshes = 7;
+        
+        // We will build:
+        // 0: Floor (4 verts, 6 indices)
+        // 1: Ceiling (4 verts, 6 indices)
+        // 2: Back Wall (4 verts, 6 indices)
+        // 3: Left Wall (4 verts, 6 indices)
+        // 4: Right Wall (4 verts, 6 indices)
+        // 5: Front Wall (4 verts, 6 indices)
+        // 6: Light (4 verts, 6 indices)
+
+        const meshVertexCounts = [4, 4, 4, 4, 4, 4, 4];
+        const meshIndexCounts = [6, 6, 6, 6, 6, 6, 6];
+
+        if (resource == null) {
+            var _vertices = [];
+            var _indices = [];
+
+            // Helper to add a quad
+            function addQuad(v0, v1, v2, v3, normal, uvs) {
+                _vertices.push(v0[0], v0[1], v0[2], normal[0], normal[1], normal[2], uvs[0][0], uvs[0][1]);
+                _vertices.push(v1[0], v1[1], v1[2], normal[0], normal[1], normal[2], uvs[1][0], uvs[1][1]);
+                _vertices.push(v2[0], v2[1], v2[2], normal[0], normal[1], normal[2], uvs[2][0], uvs[2][1]);
+                _vertices.push(v3[0], v3[1], v3[2], normal[0], normal[1], normal[2], uvs[3][0], uvs[3][1]);
+
+                _indices.push(0, 1, 2, 0, 2, 3);
+            }
+
+            // 1. Floor
+            addQuad(
+                [-277.5, 0.0, 277.5], [277.5, 0.0, 277.5], [277.5, 0.0, -277.5], [-277.5, 0.0, -277.5],
+                [0.0, 1.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 2. Ceiling
+            addQuad(
+                [-277.5, 555.0, 277.5], [-277.5, 555.0, -277.5], [277.5, 555.0, -277.5], [277.5, 555.0, 277.5],
+                [0.0, -1.0, 0.0],
+                [[0, 1], [0, 0], [1, 0], [1, 1]]
+            );
+
+            // 3. Back Wall
+            addQuad(
+                [-277.5, 0.0, -277.5], [277.5, 0.0, -277.5], [277.5, 555.0, -277.5], [-277.5, 555.0, -277.5],
+                [0.0, 0.0, 1.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 4. Left Wall (Red)
+            addQuad(
+                [-277.5, 0.0, 277.5], [-277.5, 0.0, -277.5], [-277.5, 555.0, -277.5], [-277.5, 555.0, 277.5],
+                [1.0, 0.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 5. Right Wall (Green)
+            addQuad(
+                [277.5, 0.0, -277.5], [277.5, 0.0, 277.5], [277.5, 555.0, 277.5], [277.5, 555.0, -277.5],
+                [-1.0, 0.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 6. Front Wall (at Z = 277.5, normal pointing inside: [0.0, 0.0, -1.0])
+            addQuad(
+                [277.5, 0.0, 277.5], [-277.5, 0.0, 277.5], [-277.5, 555.0, 277.5], [277.5, 555.0, 277.5],
+                [0.0, 0.0, -1.0],
+                [[1, 1], [0, 1], [0, 0], [1, 0]]
+            );
+
+            // 7. Light Source
+            addQuad(
+                [-65.0, 554.0, 52.5], [-65.0, 554.0, -52.5], [65.0, 554.0, -52.5], [65.0, 554.0, 52.5],
+                [0.0, -1.0, 0.0],
+                [[0, 1], [0, 0], [1, 0], [1, 1]]
+            );
+
+            var vertices = new Float32Array(_vertices);
+            var indices = new Uint16Array(_indices);
+
+            webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
+            webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
+        }
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.setIdVertexBuffer(idVb);
+        staticMesh.setIdIndexBuffer(idIb);
+
+        const meshNames = ["floor", "ceiling", "back_wall", "left_wall", "right_wall", "front_wall", "light"];
+        
+        let vertexOffset = 0;
+        let indexOffset = 0;
+
+        for (let i = 0; i < numMeshes; i++) {
+            var mesh = new DogMesh(meshNames[i]);
+            mesh.setNumVertices(meshVertexCounts[i]);
+            mesh.setNumIndices(meshIndexCounts[i]);
+            mesh.setFirstIndex(indexOffset);
+            mesh.setBaseVertex(vertexOffset);
+
+            if (descriptor.BoundingVolumeType === BoundingVolumeType.Box) {
+                // Calculate bounding box for this submesh
+                let vmin = [Infinity, Infinity, Infinity];
+                let vmax = [-Infinity, -Infinity, -Infinity];
+                
+                if (i === 0) { // Floor
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [277.5, 0.0, 277.5];
+                } else if (i === 1) { // Ceiling
+                    vmin = [-277.5, 555.0, -277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 2) { // Back Wall
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [277.5, 555.0, -277.5];
+                } else if (i === 3) { // Left Wall
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [-277.5, 555.0, 277.5];
+                } else if (i === 4) { // Right Wall
+                    vmin = [277.5, 0.0, -277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 5) { // Front Wall
+                    vmin = [-277.5, 0.0, 277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 6) { // Light
+                    vmin = [-65.0, 554.0, -52.5];
+                    vmax = [65.0, 554.0, 52.5];
+                }
+
+                mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
+            }
+
+            staticMesh.addMesh(mesh);
+
+            vertexOffset += meshVertexCounts[i];
+            indexOffset += meshIndexCounts[i];
+        }
+
+        return staticMesh;
+    }
 }

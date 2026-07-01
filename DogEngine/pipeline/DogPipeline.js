@@ -8,14 +8,14 @@
  * @version 1.0
  */
 class DogPipeline {
-    constructor(name, shadersSource, descriptor) {
+    constructor(name, shadersSource, descriptor, pipelineDescriptor = {}) {
         this.name = name;
-        this.vertexBufferLayout = this.createVertexBufferLayout(descriptor.vertexLayout);
-        this.shaderModule = this.createShaderModule(shadersSource);
+        this.vertexBufferLayout = webGPUengine.createVertexBufferLayout(descriptor.vertexLayout);
+        this.shaderModule = webGPUengine.createShaderModule(name + "Shader", shadersSource);
         this.topology = descriptor.topology || TopologyMode.TriangleList;
         this.frontFace = descriptor.frontFace || FrontFaceMode.Ccw;
         this.cullMode = descriptor.cullMode || CullMode.Back;
-        this.pipeline = this.createPipeline(descriptor.bindGroupLayouts);
+        this.pipeline = this.createPipeline(descriptor.bindGroupLayouts, pipelineDescriptor);
     }
 
     /**
@@ -25,7 +25,7 @@ class DogPipeline {
      * the number of components (e.g., { position: { size: 3 }, color: { size: 4 } }).
      * @returns {GPUVertexBufferLayout} Vertex buffer layout compatible with WebGPU pipeline creation.
      */
-    createVertexBufferLayout(vertexLayout) {
+    /*createVertexBufferLayout(vertexLayout) {
         var attributes = [];
         var offset = 0;
         var location = 0;
@@ -35,7 +35,7 @@ class DogPipeline {
             //console.log(`${key}: ${value}`);
             attributes.push({
                 format: "float32x" + value,
-                offset: offset, 
+                offset: offset,
                 shaderLocation: location
             });
 
@@ -48,23 +48,23 @@ class DogPipeline {
             arrayStride: stride * 4, // stride * 4 bytes per float
             attributes: attributes,
         };
-        
+
         return vertexBufferLayout;
-    }
+    }*/
 
     /**
      * Create a shader module from the provided shader source code.
      * @param {string} shaderSource Source of vextex and fragment shaders in WGSL.
      * @returns {GPUShaderModule} Shader module created from the provided source code.
      */
-    createShaderModule(shaderSource) {
+    /*createShaderModule(shaderSource) {
         const shaderModule = pGraphics.device.createShaderModule({
             label: this.name + ' Shader',
             code: shaderSource
         });
 
         return shaderModule;
-    }
+    }*/
 
     /**
      * Create a render pipeline using the shader module and vertex buffer layout defined in the constructor.
@@ -73,46 +73,52 @@ class DogPipeline {
      * @param {GPUBindGroupLayout[]} bindGroupLayouts Optional array of bind group layouts to be used in the pipeline layout.
      * @returns {GPURenderPipeline} Render pipeline created based on the shader module and vertex buffer layout.
      */
-    createPipeline(bindGroupLayouts) {
+    createPipeline(bindGroupLayouts, pipelineDescriptor) {
         var layout = "auto";
 
-        if(bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto'){
+        if (bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto') {
             layout = pGraphics.device.createPipelineLayout({
                 label: this.name + " Pipeline Layout",
                 bindGroupLayouts: bindGroupLayouts
             });
         }
 
-        const pipeline = pGraphics.device.createRenderPipeline({
-            label: this.name + " Pipeline",
-            layout: layout,
-            vertex: {
-                module: this.shaderModule,
-                entryPoint: "vertexMain",
-                buffers: [this.vertexBufferLayout]
-            },
-            fragment: {
-                module: this.shaderModule,
-                entryPoint: "fragmentMain",
-                targets: [{
-                    format: pGraphics.canvasFormat
-                }]
-            },
-            primitive: {
-                topology: this.topology, // Options: 'point-list', 'line-list', 'triangle-list'
-                // Culling settings
-                cullMode: this.cullMode,    // Options: 'none', 'front', 'back'
-                frontFace: this.frontFace   // Options: 'ccw', 'cw'
-            },
-            // Enable depth testing so that the fragment closest to the camera is rendered in front.
-            depthStencil: {
-                format: 'depth24plus', // options: 'depth24plus', 'depth32float'
-                depthWriteEnabled: true,
-                depthCompare: 'less', // Only draws if the new pixel is "closer" than the old one. options: 'never', 'less', 'equal', 'less-equal', 'greater', 'not-equal', 'greater-equal', 'always'
-            }
-        });
-        
-        return pipeline;
+        let gpuPipeline = null;
+
+        if (pipelineDescriptor && Object.keys(pipelineDescriptor).length === 0 && pipelineDescriptor.constructor === Object) {
+            gpuPipeline = pGraphics.device.createRenderPipeline({
+                label: this.name + " Pipeline",
+                layout: layout,
+                vertex: {
+                    module: this.shaderModule,
+                    entryPoint: "vertexMain",
+                    buffers: [this.vertexBufferLayout]
+                },
+                fragment: {
+                    module: this.shaderModule,
+                    entryPoint: "fragmentMain",
+                    targets: [{
+                        format: pGraphics.canvasFormat
+                    }]
+                },
+                primitive: {
+                    topology: this.topology, // Options: 'point-list', 'line-list', 'triangle-list'
+                    // Culling settings
+                    cullMode: this.cullMode,    // Options: 'none', 'front', 'back'
+                    frontFace: this.frontFace   // Options: 'ccw', 'cw'
+                },
+                // Enable depth testing so that the fragment closest to the camera is rendered in front.
+                depthStencil: {
+                    format: 'depth24plus', // options: 'depth24plus', 'depth32float'
+                    depthWriteEnabled: true,
+                    depthCompare: 'less', // Only draws if the new pixel is "closer" than the old one. options: 'never', 'less', 'equal', 'less-equal', 'greater', 'not-equal', 'greater-equal', 'always'
+                }
+            });
+        } else {
+            gpuPipeline = pGraphics.device.createRenderPipeline(pipelineDescriptor);
+        }
+
+        return gpuPipeline;
     }
 
     /**
