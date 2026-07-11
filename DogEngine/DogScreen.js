@@ -6,7 +6,7 @@
  * @version 1.0
  */
 class DogScreen {
-    constructor(name, width, height) {
+    constructor(name, width, height, type) {
         this.position = [0.0, 0.0, 0.0];
         this.mModel = glMatrix.mat4.create();
         glMatrix.mat4.translate(this.mModel, this.mModel, this.position);
@@ -15,8 +15,9 @@ class DogScreen {
         //left, right, bottom, top (inverted), near, far
         glMatrix.mat4.ortho(this.mOrtho, 0, canvas.width, canvas.height, 0, -1, 1);
 
-        this.textureView = null;
+        this.texture = null;
         this.visible = true;
+        this.type = type;
 
         const x1 = 0.0;
         const x2 = width;
@@ -33,18 +34,17 @@ class DogScreen {
         ]);
 
         this.vb = webGPUengine.createDogBuffer(name, BufferType.Vertex, data, 0, false);
-        this.cameraBuffer = webGPUengine.createDogBuffer("Camera Buffer", BufferType.Data, null, 64, false);
-        this.transformBuffer = webGPUengine.createDogBuffer("Transform Buffer", BufferType.Data, null, 64, false);
-        this.sampler = pGraphics.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+        this.cameraBuffer = webGPUengine.createDogBuffer("DogScreen-Camera-Buffer", BufferType.Data, null, 64, false);
+        this.transformBuffer = webGPUengine.createDogBuffer("DogScreen-Transform-Buffer", BufferType.Data, null, 64, false);
 
         this.bindGroups = [];
         this.bindGroupLayouts = [];
         this.createBindGroupLayouts();
-        this.pipeline = new ScreenPipeline(this.bindGroupLayouts);
+        this.pipeline = new ScreenPipeline(this.bindGroupLayouts, type);
 
         //----------------------- Bind Groups -----------------------//
         const bg0 = {
-            label: "Bind Group Camera",
+            label: "Dog Screen - Bind Group Camera",
             layout: this.bindGroupLayouts[0],
             entries: [
                 {
@@ -55,7 +55,7 @@ class DogScreen {
         };
 
         const bg3 = {
-            label: "Bind Group Transform",
+            label: "Dog Screen - Bind Group Transform",
             layout: this.bindGroupLayouts[3],
             entries: [
                 {
@@ -86,21 +86,39 @@ class DogScreen {
             buffer: { type: "uniform" }
         }];
 
-        const bgl2 = [{
-            binding: 0,
-            visibility: GPUVisibility.Fragment,
-            texture: {
-                sampleType: "float",
-                viewDimension: "2d"
-            }
-        },
-        {
-            binding: 1,
-            visibility: GPUVisibility.Fragment,
-            sampler: {
-                type: "filtering"
-            }
-        }];
+        let bgl2;
+        if (this.type == "albedo") {
+            bgl2 = [{
+                binding: 0,
+                visibility: GPUVisibility.Fragment,
+                texture: {
+                    sampleType: "float",
+                    viewDimension: "2d"
+                }
+            },
+            {
+                binding: 1,
+                visibility: GPUVisibility.Fragment,
+                sampler: {
+                    type: "filtering"
+                }
+            }];
+        } else if (this.type == "depth") {
+            bgl2 = [{
+                binding: 0,
+                visibility: GPUVisibility.Fragment,
+                texture: {
+                    sampleType: 'depth',
+                }
+            },
+            {
+                binding: 1,
+                visibility: GPUVisibility.Fragment,
+                sampler: {
+                    type: 'comparison'
+                }
+            }];
+        }
 
         const bgl3 = [{
             binding: 0,
@@ -109,10 +127,10 @@ class DogScreen {
         }]
 
         this.bindGroupLayouts = [
-            pGraphics.device.createBindGroupLayout({ label: "Screen Debug - Camera", entries: bgl0 }),
-            undefined,
-            pGraphics.device.createBindGroupLayout({ label: "Screen Debug - Texture", entries: bgl2 }),
-            pGraphics.device.createBindGroupLayout({ label: "Screen Debug - Transform", entries: bgl3 })
+            pGraphics.device.createBindGroupLayout({ label: "DogScreen-Debug-Camera", entries: bgl0 }), // 0
+            undefined, // 1
+            pGraphics.device.createBindGroupLayout({ label: "DogScreen-Debug-Texture", entries: bgl2 }), // 2
+            pGraphics.device.createBindGroupLayout({ label: "DogScreen-Debug-Transform", entries: bgl3 }) // 3
         ];
     }
 
@@ -168,10 +186,10 @@ class DogScreen {
 
     /**
      * Set a texture to render in the screen. When sets the textures the bind group is created.
-     * @param {GPUTextureView} textureView Texture object of the engine.
+     * @param {DogTexture} texture Texture object of the engine.
      */
-    setTexture(textureView) {
-        this.textureView = textureView;
+    setTexture(texture) {
+        this.texture = texture;
 
         const bindGroup = {
             label: "Bind Group Texture",
@@ -179,11 +197,11 @@ class DogScreen {
             entries: [
                 {
                     binding: 0,
-                    resource: this.textureView
+                    resource: this.texture.getWebGPUTextureView()
                 },
                 {
                     binding: 1,
-                    resource: this.sampler
+                    resource: resourceManager.get(this.texture.getIdSampler()).getWebGPUSampler()
                 }
             ]
         };

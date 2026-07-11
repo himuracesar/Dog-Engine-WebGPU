@@ -211,10 +211,12 @@
 
         let propsBindGroup;
         let propsBindGroupLayout;
+        let shadows;
 
         let dragon;
         let grid
         let cornellBox;
+        let cube;
 
         let directionalLight;
 
@@ -236,12 +238,22 @@
 
             grid = shape.createGrid(descriptor);
 
+            descriptor = {};
+            descriptor.width = 200.0;
+            descriptor.height = 200.0;
+            descriptor.depth = 200.0;
+            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
+            cube = shape.createCube(descriptor);
+
             cornellBox = shape.createCornellBox();
 
             /*dragon = await webGPUengine.createMeshByObjFile("/resources/models/dragon_standford.obj");
             dragon.getTransform().translateAbsolute(0.0, 50.0, 0.0);
             dragon.getTransform().scaleAbsolute(100.0, 100.0, 100.0);
             dragon.getTransform().rotateAbsolute(0.0, 90.0, 0.0);*/
+
+            cube.getTransform().translateAbsolute(0.0, 100.0, 0.0);
+            debugger;
         }
 
         /**
@@ -280,7 +292,22 @@
         }
 
         function createLightsAndMaterials() {
-            directionalLight = new DogDirectionalLight();
+            directionalLight = new DogDirectionalLight(true, false);
+
+            const material = new DogMaterial("m_yellow", true, false);
+            material.setDiffuseColor([1.0, 1.0, 0.0, 1.0]);
+            material.setAmbientColor([0.1, 0.1, 0.0, 1.0]);
+            material.setSpecularColor([0.7, 0.7, 0.7, 1.0]);
+
+            resourceManager.add("m_yellow", material);
+
+            cube.setMaterial(0, material.getId());
+
+            dummyTexture = webGPUengine.createDummyTexture();
+            const sampler = webGPUengine.createDogSampler("", { magFilter: "linear", minFilter: "linear" });
+
+            const idBindGroup = createBGMateralTexSamp(material, dummyTexture, sampler);
+            material.setIdBindGroup(idBindGroup);
         }
 
         async function createPipeline() {
@@ -312,14 +339,38 @@
                 await webGPUengine.readFileAsText("/shadow-mapping/shaders/ShadowMapShader.wgsl")
             ];
 
-            bgl = [
+            shadows.bglShadowMap = [
                 resourceManager.getBindGroupLayout(0),
-                undefined, // Bind group 1 is not used in this demo
-                undefined, // Bind group 2 is not used in this demo
+                undefined,
+                undefined,
                 resourceManager.getBindGroupLayout(3)
             ];
 
-            shadowMapPipeline = new ShadowMapPipeline("ShadowMap-", bgl, shadowMapShaders);
+            const idBufferShadow = webGPUengine.createDogBuffer("shadow-buffer", BufferType.Data, null, 16 * 4 * 2, true);
+            shadows.buffer = resourceManager.get(idBufferShadow);
+
+            const jsonShadowMap = {
+                label: "Shadow Map Bind Group",
+                layout: resourceManager.getBindGroupLayout(0),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: { buffer: shadows.buffer.getWebGPUBuffer() }
+                    }
+                ]
+            };
+
+            let idBindGroupShadowMap = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonShadowMap);
+
+            shadows.bgShadowMap = resourceManager.getBindGroup(idBindGroupShadowMap);
+
+            shadowMapPipeline = new ShadowMapPipeline("ShadowMap-", shadows.bglShadowMap, shadowMapShaders);
+
+            //shadows.bgl = createBGLForShadows();
+
+            shadows.bindGroup = createBGForShadows(directionalLight.getBuffer(), shadows.buffer, shadowMap, resourceManager.get(shadowMap.getIdSampler()));
+
+            directionalLight.setIdBindGroup(shadows.bindGroup);
         }
 
         function createProps() {
@@ -354,6 +405,9 @@
             });
         }
 
+        /**
+         * Create render targets for the shadow map and the depth texture.
+         */
         function createRenderTargets() {
             depthTexture = webGPUengine.createDogTexture("depthTexture", {
                 size: [canvas.width, canvas.height],
@@ -367,11 +421,17 @@
                 format: 'depth32float'
             });
 
+            const shadowSampler = webGPUengine.createDogSampler("shadowSampler", {
+                compare: 'less'
+            });
+
+            shadowMap.setIdSampler(shadowSampler.getId());
+
             // GPURenderPassDescriptor
             shadowPassDescriptor = {
                 colorAttachments: [],
                 depthStencilAttachment: {
-                    view: shadowMap.getGPUTextureView(),
+                    view: shadowMap.getWebGPUTextureView(),
                     depthClearValue: 1.0,
                     depthLoadOp: 'clear',
                     depthStoreOp: 'store',
@@ -391,7 +451,7 @@
                     },
                 ],
                 depthStencilAttachment: {
-                    view: depthTexture.getGPUTextureView(),
+                    view: depthTexture.getWebGPUTextureView(),
 
                     depthClearValue: 1.0,
                     depthLoadOp: 'clear',
@@ -404,24 +464,27 @@
         }
 
         function createShadows() {
-            const LIGHT_FRUSTUM_SIZE = 700.0;
+            const LIGHT_FRUSTUM_SIZE = 600.0;
+            const position = 800.0;
 
-            lightPosition = [-600.0, 1000.0, -600.0];
-            lightLookAt = [0.0, 0.0, 0.0];
-            lightUp = [0.0, 1.0, 0.0];
+            shadows.lightPosition = [0.0, position, -position];
+            shadows.lightLookAt = [0.0, 0.0, 0.0];
+            shadows.lightUp = [0.0, 1.0, 0.0];
+            //shadows.lightUp = [0.0, 0.0, -1.0];
 
-            let lightViewMatrix = glMatrix.mat4.create();
-            glMatrix.mat4.lookAt(lightViewMatrix, lightPosition, lightLookAt, lightUp);
+            shadows.lightViewMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.lookAt(shadows.lightViewMatrix, shadows.lightPosition, shadows.lightLookAt, shadows.lightUp);
+            //glMatrix.mat4.invert(shadows.lightViewMatrix, shadows.lightViewMatrix);
 
-            let lightProjectionMatrix = glMatrix.mat4.create();
-            glMatrix.mat4.ortho(
-                lightProjectionMatrix, -LIGHT_FRUSTUM_SIZE,
-                LIGHT_FRUSTUM_SIZE, -LIGHT_FRUSTUM_SIZE,
-                LIGHT_FRUSTUM_SIZE, 0.1,
-                LIGHT_FRUSTUM_SIZE * 2.0
+            shadows.lightProjectionMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.orthoZO(
+                shadows.lightProjectionMatrix,
+                -LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE,
+                -LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE,
+                0.0, 1000.0
+                //10.0, 50.0
+                //-LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE
             );
-
-            debugger;
         }
 
         //------------------ End demo's main functons -----------------
@@ -445,24 +508,29 @@
             webGPUengine.createBindGroupLayouts(configScene);
 
             camera = new DogCamera();
-            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setPosition([0.0, 100.0, 600.0]);
             camera.setSpeed(5.3);
             camera.setFarPlane(4000.0);
 
-            createRenderTargets();
+            shadows = {};
+
             await createShapes();
+            createLightsAndMaterials();
+            createRenderTargets();
             createProps();
             await createPipeline();
             configCornellBox();
-            createLightsAndMaterials();
             createShadows();
 
             dummyTexture = webGPUengine.createDummyTexture();
+            const sampler = webGPUengine.createDogSampler("", { magFilter: "linear", minFilter: "linear" });
 
-            screenShadowMap = new DogScreen("ScreenShadowMap", 100, 100);
-            screenShadowMap.setPosition([10.0, 10.0, 0.0]);
+            dummyTexture.setIdSampler(sampler.getName());
 
-            screenShadowMap.setTexture(dummyTexture.getGPUTextureView());
+            screenShadowMap = new DogScreen("ScreenShadowMap", 200, 100, "depth");
+            screenShadowMap.setPosition([10.0, 100.0, 0.0]);
+
+            screenShadowMap.setTexture(shadowMap);
 
             requestAnimationFrame(updateAndRender);
         }
@@ -566,6 +634,8 @@
             //dragon.update(dt);
             cornellBox.update(dt);
 
+            cube.update(dt);
+
             grid.update(dt);
 
             screenShadowMap.update();
@@ -597,6 +667,18 @@
 
             const commandEncoder = pGraphics.device.createCommandEncoder();
             {
+                pGraphics.device.queue.writeBuffer(shadows.buffer.getWebGPUBuffer(), 0, shadows.lightViewMatrix);
+                pGraphics.device.queue.writeBuffer(shadows.buffer.getWebGPUBuffer(), 16 * 4, shadows.lightProjectionMatrix);
+
+                const shadowPass = commandEncoder.beginRenderPass(shadowPassDescriptor);
+                shadowPass.setPipeline(shadowMapPipeline.getWebGPUPipeline());
+                shadowPass.setBindGroup(0, shadows.bgShadowMap);
+
+                cube.render(shadowPass);
+
+                shadowPass.end();
+            }
+            {
                 pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
                 pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
                 pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
@@ -604,15 +686,18 @@
                 const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
 
                 renderPass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-                renderPass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
 
                 renderPass.setPipeline(wireframePipeline.getWebGPUPipeline());
                 renderPass.setBindGroup(2, propsBindGroup); // Bind group para Props
                 grid.render(renderPass);
 
                 renderPass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
+                //renderPass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
+                renderPass.setBindGroup(1, resourceManager.getBindGroup(shadows.bindGroup));
+
                 //dragon.render(pass);
                 cornellBox.render(renderPass);
+                cube.render(renderPass);
 
                 screenShadowMap.render(renderPass);
 

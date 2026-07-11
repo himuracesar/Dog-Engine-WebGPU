@@ -14,15 +14,37 @@
         ]
     },
     {
-        "label": "Lighting",
+        "label": "Lighting & Shadows",
         "group": 1,
         "entries": [
             {
                 "name": "DogDirectionalLight",
                 "binding": 0,
+                "visibility": "Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            },
+            {
+                "name": "Light Data",
+                "binding": 1,
                 "visibility": "Vertex | Fragment",
                 "buffer": {
                     "type": "uniform"
+                }
+            },
+            {
+                "binding": 2,
+                "visibility": "Fragment",
+                "texture": {
+                    "sampleType": "depth"
+                }
+            },
+            {
+                "binding": 3,
+                "visibility": "Fragment",
+                "sampler": {
+                    "type": "comparison"
                 }
             }
         ]
@@ -34,7 +56,7 @@
             {
                 "name": "DogMaterial",
                 "binding": 0,
-                "visibility": "Vertex | Fragment",
+                "visibility": "Fragment",
                 "buffer": {
                     "type": "uniform"
                 }

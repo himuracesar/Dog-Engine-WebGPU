@@ -18,7 +18,7 @@ class ShadowMapPipeline extends DogPipeline {
             ${shaders[0] ? shaders[0] : ""} 
         `;
 
-        let vertexLayout = { "position": 3 };
+        let vertexLayout = { "position": 3, "normal": 3, "texCoord": 2 };
 
         let descriptor = {
             vertexLayout: vertexLayout,
@@ -27,6 +27,8 @@ class ShadowMapPipeline extends DogPipeline {
 
         const shaderModule = webGPUengine.createShaderModule(name + "Shader", shader);
         const vertexBufferLayout = webGPUengine.createVertexBufferLayout(vertexLayout);
+
+        const layout = webGPUengine.createPipelineLayout(name, bindGroupLayouts);
 
         let pipelineDescriptor = {
             label: name + " Pipeline",
@@ -39,12 +41,12 @@ class ShadowMapPipeline extends DogPipeline {
             primitive: {
                 topology: "triangle-list", // Options: 'point-list', 'line-list', 'triangle-list'
                 // Culling settings
-                cullMode: "back",    // Options: 'none', 'front', 'back'
+                cullMode: "none",    // Options: 'none', 'front', 'back'
                 frontFace: "ccw"   // Options: 'ccw', 'cw'
             },
             // Enable depth testing so that the fragment closest to the camera is rendered in front.
             depthStencil: {
-                format: 'depth24plus', // options: 'depth24plus', 'depth32float'
+                format: 'depth32float', // options: 'depth24plus', 'depth32float'
                 depthWriteEnabled: true,
                 depthCompare: 'less', // Only draws if the new pixel is "closer" than the old one. options: 'never', 'less', 'equal', 'less-equal', 'greater', 'not-equal', 'greater-equal', 'always'
             }

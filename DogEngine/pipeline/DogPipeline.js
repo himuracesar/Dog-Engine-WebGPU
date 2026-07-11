@@ -74,14 +74,16 @@ class DogPipeline {
      * @returns {GPURenderPipeline} Render pipeline created based on the shader module and vertex buffer layout.
      */
     createPipeline(bindGroupLayouts, pipelineDescriptor) {
-        var layout = "auto";
+        /*var layout = "auto";
 
         if (bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto') {
             layout = pGraphics.device.createPipelineLayout({
                 label: this.name + " Pipeline Layout",
                 bindGroupLayouts: bindGroupLayouts
             });
-        }
+        }*/
+
+        const layout = webGPUengine.createPipelineLayout(this.name, bindGroupLayouts);
 
         let gpuPipeline = null;
 

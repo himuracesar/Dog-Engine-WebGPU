@@ -136,6 +136,44 @@ const GPUVisibility = Object.freeze({
             format: canvasFormat,
         });
 
+        /******
+         // Get the device pixel ratio (default to 1 if undefined)
+            const dpr = window.devicePixelRatio || 1;
+
+            // Calculate actual screen pixel dimensions
+            const width = Math.floor(canvas.clientWidth * dpr);
+            const height = Math.floor(canvas.clientHeight * dpr);
+
+            // Update canvas internal drawing buffer size
+            canvas.width = width;
+            canvas.height = height;
+
+            // Configure your WebGPU context texture size
+            const context = canvas.getContext("webgpu");
+            context.configure({
+                device: device,
+                format: navigator.gpu.getPreferredCanvasFormat(),
+                alphaMode: 'opaque',
+                size: [width, height], // Must match canvas.width/height
+            });
+
+            const resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    // Math.floor prevents subpixel rounding bugs
+                    const dpr = window.devicePixelRatio || 1;
+                    const width = Math.floor(entry.contentRect.width * dpr);
+                    const height = Math.floor(entry.contentRect.height * dpr);
+        
+                    // Trigger your WebGPU canvas.width/height update 
+                    // and re-run context.configure() with the new size
+                    resizeCanvasAndStorageTextures(width, height);
+                }
+            });
+
+            // Watch your canvas element
+            resizeObserver.observe(canvas);
+         */
+
         const info = adapter.info;
         console.log(`Dog Engine - Vendor: ${info.vendor}`);      // Ej: "nvidia" o "intel"
         console.log(`Dog Engine - Architecture: ${info.architecture}`);
@@ -153,9 +191,8 @@ const GPUVisibility = Object.freeze({
 
     /**
      * Create bind groups based on the input JSON configuration.
-     * @param {JSON Object} groups - An array of configuration objects, each containing
-     *                               group, binding, and entry information for creating
-     *                               bind groups.
+     * @param {string} id - Name or Id of the bind group.
+     * @param {JSON Object} descriptor - Descriptor for creating the bind group.
      * @returns {string} The name of the bind group.
      */
     function createBindGroup(id, descriptor) {
@@ -366,7 +403,7 @@ const GPUVisibility = Object.freeze({
         );
 
         texture = new DogTexture(name);
-        texture.setGPUTexture(gpuTexture);
+        texture.setWebGPUTexture(gpuTexture);
         texture.setWidthAndHeight(imageBitmap.width, imageBitmap.height);
         texture.setFormat(gpuTexture.format);
         texture.addReference();
@@ -403,7 +440,7 @@ const GPUVisibility = Object.freeze({
         );
 
         texture = new DogTexture(name);
-        texture.setGPUTexture(gpuTexture);
+        texture.setWebGPUTexture(gpuTexture);
         texture.setWidthAndHeight(1, 1);
         texture.setFormat(gpuTexture.format);
         texture.addReference();
@@ -428,7 +465,7 @@ const GPUVisibility = Object.freeze({
         });
 
         const texture = new DogTexture(name);
-        texture.setGPUTexture(gpuTexture);
+        texture.setWebGPUTexture(gpuTexture);
         texture.setWidthAndHeight(descriptor.size[0], descriptor.size[1]);
         texture.setFormat(descriptor.format);
         texture.addReference();
@@ -475,28 +512,38 @@ const GPUVisibility = Object.freeze({
      * Create a DogSampler and stores in the resource manager. If the sampler already exists in the resource manager, 
      * increase the number of references and it will be returned.
      * @param {string} name Name/Id of the sampler (id of the resource).
-     * @param {object} config Configuration of the sampler. 
-     *                      The configuration object has the following properties:
-     * @param config.addressModeU {string} Address mode for the U coordinate. (default: "")
-     * @param config.addressModeV {string} Address mode for the V coordinate. (default: "")
-     * @param config.magFilter {string} Magnification filter. (default: "")
-     * @param config.minFilter {string} Minification filter. (default: "")
-     * @param config.mipmapFilter {string} Mipmap filter. (default: "")
+     * @param {object} descriptor Configuration of the sampler. 
+     *                      The descriptor object has the following properties:
+     * @param descriptor.addressModeU {string} Address mode for the U coordinate. (default: "")
+     * @param descriptor.addressModeV {string} Address mode for the V coordinate. (default: "")
+     * @param descriptor.magFilter {string} Magnification filter. (default: "")
+     * @param descriptor.minFilter {string} Minification filter. (default: "")
+     * @param descriptor.mipmapFilter {string} Mipmap filter. (default: "")
+     * @param descriptor.compare {string} Comparison function. (default: undefined)
      * @returns {DogSampler} The sampler if the creation and stores in the resource manager is ok, null otherwise.
      */
-    function createDogSampler(name, config = {}) {
-        const amu = config.addressModeU || "";
-        const amv = config.addressModeV || "";
-        const maf = config.magFilter || "";
-        const mif = config.minFilter || "";
-        const mm = config.mipmapFilter || "";
+    function createDogSampler(name, descriptor = {}) {
+        const amu = descriptor.addressModeU || "";
+        const amv = descriptor.addressModeV || "";
+        const maf = descriptor.magFilter || "";
+        const mif = descriptor.minFilter || "";
+        const mm = descriptor.mipmapFilter || "";
+        const compare = descriptor.compare || "";
 
         if (name === undefined || name == null || name == "") {
-            name = "amu-" + amu.substring(0, 2) +
-                "amv-" + amv.substring(0, 2) +
-                "maf-" + maf.substring(0, 2) +
-                "mif-" + mif.substring(0, 2) +
-                "mm-" + mm.substring(0, 2);
+            name = "";
+            if (amu != "")
+                name += "amu-" + amu.substring(0, 2);
+            if (amv != "")
+                name += "amv-" + amv.substring(0, 2);
+            if (maf != "")
+                name += "maf-" + maf.substring(0, 2);
+            if (mif != "")
+                name += "mif-" + mif.substring(0, 2);
+            if (mm != "")
+                name += "mm-" + mm.substring(0, 2);
+            if (compare != "")
+                name += "cmp-" + compare;
         }
 
         if (resourceManager.get(name) !== undefined && resourceManager.get(name) !== null) {
@@ -506,7 +553,7 @@ const GPUVisibility = Object.freeze({
             return sampler;
         }
 
-        const sampler = new DogSampler(name, config);
+        const sampler = new DogSampler(name, descriptor);
         sampler.addReference();
 
         resourceManager.add(name, sampler);
@@ -591,7 +638,7 @@ const GPUVisibility = Object.freeze({
                     },
                     {
                         binding: 2,
-                        resource: sampler.getGPUSampler()
+                        resource: sampler.getWebGPUSampler()
                     }
                 ]
             };
@@ -630,7 +677,7 @@ const GPUVisibility = Object.freeze({
                     },
                     {
                         binding: 2,
-                        resource: sampler.getGPUSampler()
+                        resource: sampler.getWebGPUSampler()
                     }
                 ]
             };
@@ -747,6 +794,25 @@ const GPUVisibility = Object.freeze({
         return vertexBufferLayout;
     }
 
+    /**
+     * Create a pipeline layout based on the provided bind group layouts.
+     * @param {string} name Name of the pipeline layout.
+     * @param {GPUBindGroupLayout[]} bindGroupLayouts Array of bind group layouts to be used in the pipeline layout.
+     * @returns {GPUPipelineLayout} Pipeline layout created based on the bind group layouts.
+     */
+    function createPipelineLayout(name, bindGroupLayouts) {
+        var layout = "auto";
+
+        if (bindGroupLayouts != null && bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto') {
+            layout = pGraphics.device.createPipelineLayout({
+                label: name + " Pipeline Layout",
+                bindGroupLayouts: bindGroupLayouts
+            });
+        }
+
+        return layout;
+    }
+
     return {
         initWebGPU: initWebGPU,
         createBindGroupLayouts: createBindGroupLayouts,
@@ -763,7 +829,8 @@ const GPUVisibility = Object.freeze({
         createDefaultMaterial: createDefaultMaterial,
         createMeshByObjFile: createMeshByObjFile,
         createShaderModule: createShaderModule,
-        createVertexBufferLayout: createVertexBufferLayout
+        createVertexBufferLayout: createVertexBufferLayout,
+        createPipelineLayout: createPipelineLayout
     }
 
 })
