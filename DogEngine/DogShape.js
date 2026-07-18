@@ -25,7 +25,7 @@ class DogShape {
      * @param {float} descriptor.width - Width of the cube (x).
      * @param {float} descriptor.height - Height of the cube (y).
      * @param {float} descriptor.depth - Depth of the cube (z).
-     * @param {DogBoundingVolumeEnums.Type} descriptor.BoundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
+     * @param {DogBoundingVolumeEnums.Type} descriptor.boundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
      * @returns {DogStaticMesh} Cube with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
     createCube(descriptor) {
@@ -119,7 +119,7 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if (descriptor.BoundingVolumeType === BoundingVolumeType.Box) {
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
         }
 
@@ -276,7 +276,7 @@ class DogShape {
         staticMesh.setIdVertexBuffer(idVb);
         staticMesh.setIdIndexBuffer(idIb);
 
-        if (descriptor.BoundingVolumeType === BoundingVolumeType.Sphere) {
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Sphere) {
             mesh.setBoundingVolume(new DogBoundingSphere({
                 position: [0.0, 0.0, 0.0],
                 radio: descriptor.radio,
@@ -542,7 +542,7 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if (descriptor.BoundingVolumeType === BoundingVolumeType.Box) {
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
@@ -750,7 +750,7 @@ class DogShape {
         mesh.setNumVertices(numVerts);
         mesh.setNumIndices(numIndices);
 
-        if (descriptor.BoundingVolumeType === BoundingVolumeType.Box) {
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
@@ -765,7 +765,7 @@ class DogShape {
     /**
      * Create a Cornell Box mesh with standard dimensions.
      * @param {JSON object} descriptor - Descriptor of the Cornell Box.
-     * @param {DogBoundingVolumeEnums.Type} descriptor.BoundingVolumeType Type of bounding volume to create for the meshes.
+     * @param {DogBoundingVolumeEnums.Type} descriptor.boundingVolumeType Type of bounding volume to create for the meshes.
      * @returns {DogStaticMesh} Cornell Box with vertex format { position: 3, normal: 3, texture coords: 2 }
      * 
      * @author Gemini 3 Pro High
@@ -883,7 +883,7 @@ class DogShape {
             mesh.setFirstIndex(indexOffset);
             mesh.setBaseVertex(vertexOffset);
 
-            if (descriptor.BoundingVolumeType === BoundingVolumeType.Box) {
+            if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
                 // Calculate bounding box for this submesh
                 let vmin = [Infinity, Infinity, Infinity];
                 let vmax = [-Infinity, -Infinity, -Infinity];

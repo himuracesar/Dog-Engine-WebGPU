@@ -43,6 +43,40 @@
             /* Force GPU Layer */
         }
 
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewport-container canvas {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading-overlay {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #11111100;
+            /* opcional, para tapar el canvas mientras carga */
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         /* Containers for the Widgets */
         .widget-pane {
             /*position: fixed;*/
@@ -110,6 +144,12 @@
             intensity: 1.0
         };
 
+        let shadowState = {
+            lightPosition: { x: 1000.0, y: 1000.0, z: -1000.0 },
+            lightLookAt: { x: 0.0, y: 0.0, z: 0.0 },
+            padding: 100.0
+        };
+
     </script>
 
     <script type="module">
@@ -129,7 +169,7 @@
         paneConfig.addBinding(configState, 'background', { color: { type: 'float' } }).on('change', emitUI);
 
         // --- Widget 3: Lights  ---
-        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights' });
+        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights & 🌒 Shadows' });
         const directionalLightFolder = paneLights.addFolder({
             title: 'Directional Light',
             expanded: false,   // optional
@@ -140,11 +180,25 @@
         directionalLightFolder.addBinding(directionalLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
         directionalLightFolder.addBinding(directionalLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1 }).on('change', emitUI);
 
+        const shadowFolder = paneLights.addFolder({
+            title: 'Shadows',
+            expanded: false,   // optional
+        });
+
+        shadowFolder.addBinding(shadowState, 'lightPosition', { label: "Light Position", vector: { type: 'float' } }).on('change', shadowChange);
+        shadowFolder.addBinding(shadowState, 'lightLookAt', { label: "Loook At", vector: { type: 'float' } }).on('change', emitUI);
+        shadowFolder.addBinding(shadowState, 'padding', { label: 'Padding', min: 0, max: 1000, step: 0.1 }).on('change', emitUI);
+
         // Send data to the engine
         function emitUI() {
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
             window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
+        }
+
+        function shadowChange() {
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: shadowState }));
+            createShadows();
         }
 
         // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
@@ -158,6 +212,7 @@
 
         // Emit initial state
         emitUI();
+        shadowChange();
     </script>
 
     <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
@@ -184,6 +239,13 @@
     <!-- Containers for Tweakpane -->
     <div id="ui-performance" class="widget-pane"></div>
     <div id="ui-config" class="widget-pane"></div>
+
+    <!-- -->
+    <div class="viewport-container">
+        <div id="loading-overlay">
+            <img src="/images/Pacman-loading.gif" alt="Loading...">
+        </div>
+    </div>
 
     <script type="text/javascript">
         var canvas;
@@ -225,6 +287,8 @@
         let shadowPassDescriptor;
         let renderPassDescriptor;
 
+        let meshesInShadow = [];
+
         //------------------- Demo's main functions -------------------
         async function createShapes() {
             const shape = new DogShape();
@@ -242,18 +306,23 @@
             descriptor.width = 200.0;
             descriptor.height = 200.0;
             descriptor.depth = 200.0;
-            descriptor.BoundingVolumeType = BoundingVolumeType.Box;
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
             cube = shape.createCube(descriptor);
 
-            cornellBox = shape.createCornellBox();
+            descriptor = {};
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
 
-            /*dragon = await webGPUengine.createMeshByObjFile("/resources/models/dragon_standford.obj");
-            dragon.getTransform().translateAbsolute(0.0, 50.0, 0.0);
-            dragon.getTransform().scaleAbsolute(100.0, 100.0, 100.0);
-            dragon.getTransform().rotateAbsolute(0.0, 90.0, 0.0);*/
+            cornellBox = shape.createCornellBox(descriptor);
+
+            dragon = await webGPUengine.createMeshByObjFile("/resources/models/dragon_standford.obj");
+            dragon.getTransform().translateAbsolute(0.0, 260.0, 0.0);
+            dragon.getTransform().scaleAbsolute(250.0, 250.0, 250.0);
+            dragon.getTransform().rotateAbsolute(0.0, 90.0, 0.0);
 
             cube.getTransform().translateAbsolute(0.0, 100.0, 0.0);
-            debugger;
+
+            meshesInShadow.push(cube);
+            meshesInShadow.push(cornellBox);
         }
 
         /**
@@ -271,6 +340,8 @@
             let m_green = new DogMaterial("m_green", true, false);
             m_green.setDiffuseColor([0.0, 1.0, 0.0, 1.0]);
             m_green.setAmbientColor([0.0, 0.1, 0.0, 1.0]);
+            m_green.setSpecularColor([0.0, 0.0, 0.0, 1.0]);
+            m_green.setSpecularPower(0.0);
 
             resourceManager.add("m_red", m_red);
             resourceManager.add("m_white", m_white);
@@ -464,27 +535,20 @@
         }
 
         function createShadows() {
-            const LIGHT_FRUSTUM_SIZE = 600.0;
-            const position = 800.0;
+            if (shadowState === undefined || shadowState == null)
+                return;
 
-            shadows.lightPosition = [0.0, position, -position];
-            shadows.lightLookAt = [0.0, 0.0, 0.0];
-            shadows.lightUp = [0.0, 1.0, 0.0];
-            //shadows.lightUp = [0.0, 0.0, -1.0];
+            shadows.lightPosition = [shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z];
+            shadows.lightLookAt = [shadowState.lightLookAt.x, shadowState.lightLookAt.y, shadowState.lightLookAt.z];
 
-            shadows.lightViewMatrix = glMatrix.mat4.create();
-            glMatrix.mat4.lookAt(shadows.lightViewMatrix, shadows.lightPosition, shadows.lightLookAt, shadows.lightUp);
-            //glMatrix.mat4.invert(shadows.lightViewMatrix, shadows.lightViewMatrix);
+            let sceneBounds = webGPUengine.getAllMinAndMaxVectorInMeshes(meshesInShadow);
 
-            shadows.lightProjectionMatrix = glMatrix.mat4.create();
-            glMatrix.mat4.orthoZO(
-                shadows.lightProjectionMatrix,
-                -LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE,
-                -LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE,
-                0.0, 1000.0
-                //10.0, 50.0
-                //-LIGHT_FRUSTUM_SIZE, LIGHT_FRUSTUM_SIZE
-            );
+            let light = webGPUengine.calculateDynamicLightMatrices(shadows.lightPosition, shadows.lightLookAt, sceneBounds, shadowState.padding);
+
+            shadows.lightViewMatrix = light.viewMatrix;
+            shadows.lightProjectionMatrix = light.projectionMatrix;
+
+            console.log("shadows");
         }
 
         //------------------ End demo's main functons -----------------
@@ -531,6 +595,11 @@
             screenShadowMap.setPosition([10.0, 100.0, 0.0]);
 
             screenShadowMap.setTexture(shadowMap);
+            screenShadowMap.setVisible(false);
+
+            const overlay = document.getElementById('loading-overlay');
+
+            overlay.classList.add('hidden');
 
             requestAnimationFrame(updateAndRender);
         }
@@ -631,7 +700,7 @@
             directionalLight.setIntensity(directionalLightState.intensity);
             //--------------- end update lights and materials from the UI state ---------------
 
-            //dragon.update(dt);
+            dragon.update(dt);
             cornellBox.update(dt);
 
             cube.update(dt);
@@ -645,24 +714,6 @@
          * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
          */
         function render() {
-            // Rendering logic goes here (e.g., issuing draw calls)
-            /*const encoder = pGraphics.device.createCommandEncoder();
-            const pass = encoder.beginRenderPass({
-                colorAttachments: [{
-                    view: pGraphics.context.getCurrentTexture().createView(),
-                    loadOp: "clear",
-                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a },
-                    storeOp: "store",
-                }],
-
-                depthStencilAttachment: {
-                    view: depthTexture.getGPUTextureView(),
-                    depthClearValue: 1.0, // 1.0 is the farthest point
-                    depthLoadOp: 'clear',
-                    depthStoreOp: 'store',
-                }
-            });*/
-
             renderPassDescriptor.colorAttachments[0].view = pGraphics.context.getCurrentTexture().createView();
 
             const commandEncoder = pGraphics.device.createCommandEncoder();
@@ -675,6 +726,7 @@
                 shadowPass.setBindGroup(0, shadows.bgShadowMap);
 
                 cube.render(shadowPass);
+                dragon.render(shadowPass);
 
                 shadowPass.end();
             }
@@ -695,7 +747,7 @@
                 //renderPass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
                 renderPass.setBindGroup(1, resourceManager.getBindGroup(shadows.bindGroup));
 
-                //dragon.render(pass);
+                dragon.render(renderPass);
                 cornellBox.render(renderPass);
                 cube.render(renderPass);
 
@@ -703,25 +755,6 @@
 
                 renderPass.end();
             }
-
-            /*pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
-            pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
-
-            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-            pass.setBindGroup(directionalLight.getGroup(), directionalLight.getBindGroup());
-
-            pass.setPipeline(wireframePipeline.getWebGPUPipeline());
-            pass.setBindGroup(2, propsBindGroup); // Bind group para Props
-            grid.render(pass);
-
-            pass.setPipeline(phongShadingPipeline.getWebGPUPipeline());
-            //dragon.render(pass);
-            cornellBox.render(pass);
-
-            screenShadowMap.render(pass);
-
-            pass.end();*/
 
             const commandBuffer = commandEncoder.finish();
 

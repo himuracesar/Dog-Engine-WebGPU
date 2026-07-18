@@ -41,7 +41,7 @@ class ShadowMapPipeline extends DogPipeline {
             primitive: {
                 topology: "triangle-list", // Options: 'point-list', 'line-list', 'triangle-list'
                 // Culling settings
-                cullMode: "none",    // Options: 'none', 'front', 'back'
+                cullMode: "front",    // Options: 'none', 'front', 'back'
                 frontFace: "ccw"   // Options: 'ccw', 'cw'
             },
             // Enable depth testing so that the fragment closest to the camera is rendered in front.
@@ -49,6 +49,8 @@ class ShadowMapPipeline extends DogPipeline {
                 format: 'depth32float', // options: 'depth24plus', 'depth32float'
                 depthWriteEnabled: true,
                 depthCompare: 'less', // Only draws if the new pixel is "closer" than the old one. options: 'never', 'less', 'equal', 'less-equal', 'greater', 'not-equal', 'greater-equal', 'always'
+                depthBias: 2.0,
+                depthBiasSlopeScale: 1.5
             }
         };
 

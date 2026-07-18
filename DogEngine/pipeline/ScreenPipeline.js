@@ -17,7 +17,7 @@ class ScreenPipeline extends DogPipeline {
                 @group(2) @binding(1)
                 var samp: sampler;`;
         } else if (type == "depth") {
-            textureSample = "vec4f(textureSampleCompare(texture, samp, texCoord, 0.5), 0.0f, 0.0f, 1.0f);";
+            textureSample = "vec4f(textureSampleCompare(texture, samp, texCoord, -0.1f), 0.0f, 0.0f, 1.0f);";
             format = `
                 @group(2) @binding(0)
                 var texture: texture_depth_2d; 

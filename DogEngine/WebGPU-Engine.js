@@ -673,7 +673,7 @@ const GPUVisibility = Object.freeze({
                     },
                     {
                         binding: 1,
-                        resource: texture.getGPUTextureView()
+                        resource: texture.getWebGPUTextureView()
                     },
                     {
                         binding: 2,
@@ -813,6 +813,105 @@ const GPUVisibility = Object.freeze({
         return layout;
     }
 
+    /**
+     * Get all min and max vector in the boundings belong to the meshes.
+     * @param {DogStaticMesh[]} meshList Array of meshes.
+     * @returns {Array of Vector3} Array of vectors.
+     */
+    function getAllMinAndMaxVectorInMeshes(meshList) {
+        let vectors = [];
+
+        for (var i = 0; i < meshList.length; i++) {
+            const mesh = meshList[i];
+            for (var j = 0; j < mesh.getNumMeshes(); j++) {
+                let bounding = mesh.getMesh(j).getBoundingVolume();
+
+                vectors.push(bounding.getVectorMin());
+                vectors.push(bounding.getVectorMax());
+            }
+        }
+
+        return vectors;
+    }
+
+    /****
+     TODO Check this
+
+     import { mat4, vec3 } from 'gl-matrix';
+    */
+    /**
+     * Calcula dinámicamente la matriz de vista y la matriz ortogonal para la luz.
+     * @param {vec3} lightPos - Posición de la luz en el mundo.
+     * @param {vec3} lightTarget - Punto al que mira la luz.
+     * @param {Array} sceneBounds - Lista de puntos mínimos y máximos de los objetos en el mundo.
+     */
+    function calculateDynamicLightMatrices(lightPos, lightTarget, sceneBounds, padding) {
+        // 1. Calcular el vector UP dinámico para evitar singularidades
+        let lightDir = glMatrix.vec3.create();
+        glMatrix.vec3.sub(lightDir, lightTarget, lightPos);
+        glMatrix.vec3.normalize(lightDir, lightDir);
+
+        let lightUp = glMatrix.vec3.fromValues(0, 1, 0);
+        // Si la luz apunta casi verticalmente hacia abajo o arriba, cambiamos el UP al eje Z
+        if (Math.abs(lightDir[0]) < 0.001 && Math.abs(lightDir[2]) < 0.001) {
+            lightUp = glMatrix.vec3.fromValues(0, 0, -1);
+        }
+
+        // 2. Construir la Matriz de Vista de la Luz
+        let lightViewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightUp);
+        //glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightDir);
+        //glMatrix.mat4.invert(lightViewMatrix, lightViewMatrix);
+
+        // 3. Encontrar los límites en el espacio de la luz
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+
+        // Transformamos las esquinas de los objetos al espacio de la luz
+        for (const worldPoint of sceneBounds) {
+            let lightSpacePoint = glMatrix.vec3.create();
+            glMatrix.vec3.transformMat4(lightSpacePoint, worldPoint, lightViewMatrix);
+
+            // Actualizamos los extremos de nuestra caja ortogonal
+            if (lightSpacePoint[0] < minX) minX = lightSpacePoint[0];
+            if (lightSpacePoint[0] > maxX) maxX = lightSpacePoint[0];
+
+            if (lightSpacePoint[1] < minY) minY = lightSpacePoint[1];
+            if (lightSpacePoint[1] > maxY) maxY = lightSpacePoint[1];
+
+            if (lightSpacePoint[2] < minZ) minZ = lightSpacePoint[2];
+            if (lightSpacePoint[2] > maxZ) maxZ = lightSpacePoint[2];
+        }
+
+        // 4. Añadir un pequeño margen de seguridad (Padding)
+        // Esto evita que las sombras se corten abruptamente en los bordes debido al sesgo numérico
+        //const padding = 400.0;
+        let left = minX - padding;
+        let right = maxX + padding;
+        let bottom = minY - padding;
+        let top = maxY + padding;
+
+        // WebGPU requiere Z entre 0 y 1. 
+        // En el espacio de la luz de glMatrix, mirar "hacia adelante" entra en el eje Z negativo.
+        // Por lo tanto, el objeto más cercano a la luz tendrá el valor Z más alto (menos negativo),
+        // y el más lejano tendrá el valor Z más bajo (más negativo).
+        let near = -maxZ - padding;
+        let far = -minZ + padding;
+
+        // Forzar un near mínimo para evitar errores si la luz está encima de un objeto
+        if (near < 0.1) near = 0.1;
+
+        // 5. Construir la Matriz Ortogonal para WebGPU (Zero-to-One)
+        let lightProjectionMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.orthoZO(lightProjectionMatrix, left, right, bottom, top, near, far);
+
+        return {
+            viewMatrix: lightViewMatrix,
+            projectionMatrix: lightProjectionMatrix
+        };
+    }
+
     return {
         initWebGPU: initWebGPU,
         createBindGroupLayouts: createBindGroupLayouts,
@@ -830,7 +929,9 @@ const GPUVisibility = Object.freeze({
         createMeshByObjFile: createMeshByObjFile,
         createShaderModule: createShaderModule,
         createVertexBufferLayout: createVertexBufferLayout,
-        createPipelineLayout: createPipelineLayout
+        createPipelineLayout: createPipelineLayout,
+        getAllMinAndMaxVectorInMeshes: getAllMinAndMaxVectorInMeshes,
+        calculateDynamicLightMatrices: calculateDynamicLightMatrices
     }
 
 })
