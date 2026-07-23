@@ -538,6 +538,9 @@
             if (shadowState === undefined || shadowState == null)
                 return;
 
+            if (directionalLight !== undefined && directionalLight != null)
+                directionalLight.setPosition([shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z, 1.0]);
+
             shadows.lightPosition = [shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z];
             shadows.lightLookAt = [shadowState.lightLookAt.x, shadowState.lightLookAt.y, shadowState.lightLookAt.z];
 

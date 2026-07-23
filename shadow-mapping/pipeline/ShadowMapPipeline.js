@@ -49,8 +49,8 @@ class ShadowMapPipeline extends DogPipeline {
                 format: 'depth32float', // options: 'depth24plus', 'depth32float'
                 depthWriteEnabled: true,
                 depthCompare: 'less', // Only draws if the new pixel is "closer" than the old one. options: 'never', 'less', 'equal', 'less-equal', 'greater', 'not-equal', 'greater-equal', 'always'
-                depthBias: 2.0,
-                depthBiasSlopeScale: 1.5
+                depthBias: 100000.0,
+                depthBiasSlopeScale: 1.0
             }
         };
 

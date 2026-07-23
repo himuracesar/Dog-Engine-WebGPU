@@ -3,7 +3,8 @@ struct VertexOutput {
     @location(1) normal : vec3<f32>,
     @location(2) texCoord : vec2<f32>,
     @location(3) positionWV : vec3<f32>,
-    @location(4) posShadow : vec4<f32>
+    @location(4) posShadow : vec4<f32>,
+    @location(5) positionW : vec3<f32>
 };
 
 struct Light {
@@ -35,7 +36,15 @@ var samp: sampler;
 @group(3) @binding(0)
 var<uniform> model: Model;
 
-fn ShadowCalculation(fragPosLightSpace: vec4<f32>, normalW: vec3<f32>) -> f32
+/**
+ * Calculate the shadow of the fragment using percentage-closer filtering (PCF).
+ * 
+ * @param fragPosLightSpace - The position of the fragment in light space.
+ * @param positionW - The position of the fragment in world space.
+ * @param normalW - The normal of the fragment in world space.
+ * @return The shadow of the fragment.
+ */
+fn ShadowCalculation(fragPosLightSpace: vec4<f32>, positionW: vec3<f32>, normalW: vec3<f32>) -> f32
 {
     var projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
@@ -45,26 +54,33 @@ fn ShadowCalculation(fragPosLightSpace: vec4<f32>, normalW: vec3<f32>) -> f32
     if (projCoords.x < 0.0 || projCoords.x > 1.0 || 
         projCoords.y < 0.0 || projCoords.y > 1.0 || 
         projCoords.z > 1.0 || projCoords.z < 0.0) {
-        return 0.0; 
+        return 0.0f; 
     }
 
     var shadow = 0.0f;
-    let texelSize = 1.0f / vec2<f32>(textureDimensions(shadowMap, 0));
+    let texelSize = 1.0f / 1024.0f; //vec2<f32>(textureDimensions(shadowMap, 0));
     
     // The bias avoid the shadow acne (you must adjust this value)
     //let bias = 0.005f; 
-    let bias = 0.0015f;
-    let lightDir = normalize(directionalLight.direction.xyz); 
+    let bias = 0.0f;
+    //let bias = 0.0015f;
+    let lightDir = normalize(directionalLight.position.xyz - positionW); 
     //let bias = max(0.001f, 0.005f * (1.0f - dot(normalW, lightDir)));
     // Usamos el dot product para obtener el coseno del ángulo
-    //let cosTheta = clamp(dot(normalize(normalW), normalize(lightDir)), 0.0, 1.0);
+    //let cosTheta = clamp(dot(normalW, lightDir), 0.0f, 1.0f);
     // Calculamos el bias usando la función tangente para suavizar la transición en pendientes
-    //let bias = clamp(0.05 * tan(acos(cosTheta)), 0.005, 0.05);
+    //let bias = clamp(0.05f * tan(acos(cosTheta)), 0.005f, 0.05f);
 
-    let NdotL = dot(normalize(normalW), normalize(lightDir));
-    // Si la cara mira a la luz, forzamos que no haya sombra
-    if (NdotL > 0.0) {
-        return 0.0; // O simplemente reduce la influencia de la sombra
+    let NdotL = dot(normalW, lightDir);
+    /*
+    The dot product is used to determine if the fragment is lit by the light.
+    NdotL == 0.0f -> The light is orthogonal to the normal
+    NdotL > 0.0f -> The light is in front of the normal or almost parallel to it. The angle is less than 90 degrees.
+    NdotL < 0.0f -> The light is behind the normal. The angle is greater than 90 degrees.
+    -- César Himura 22/07/2026
+    */
+    if (NdotL < 0.0f) {
+        return 1.0f;
     }
 
     let currentDepth = projCoords.z - bias;
@@ -77,12 +93,10 @@ fn ShadowCalculation(fragPosLightSpace: vec4<f32>, normalW: vec3<f32>) -> f32
             let offset = vec2<f32>(f32(x), f32(y)) * texelSize;
             // La GPU compara projCoords.z (con bias) contra el valor en la textura
             shadow += textureSampleCompareLevel(shadowMap, shadowSampler, projCoords.xy + offset, currentDepth);
-            //shadow += textureSampleCompareLevel(shadowMap, shadowSampler, projCoords.xy, currentDepth);
         }
     }
 
     return shadow / 9.0f;
-    //return currentDepth;
 }
 
 @vertex
@@ -99,7 +113,7 @@ VertexOutput {
     output.normal = (model.modelMatrix * vec4f(normal, 0.0)).xyz;
     output.positionWV = (camera.viewMatrix * model.modelMatrix * vec4f(position, 1.0)).xyz;
     output.posShadow = light.projectionMatrix * light.viewMatrix * model.modelMatrix * vec4(position, 1.0);
-    //output.posShadow = vec4<f32>(output.posShadow.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5), output.posShadow.z,  1.0f);
+    output.positionW = (model.modelMatrix * vec4f(position, 1.0)).xyz;
 
     output.texCoord = texCoord;
 
@@ -111,7 +125,8 @@ fn fragmentMain(
     @location(1) normal: vec3f,
     @location(2) texCoord: vec2f,
     @location(3) positionWV: vec3f,
-    @location(4) posShadow: vec4f
+    @location(4) posShadow: vec4f,
+    @location(5) positionW: vec3f
 ) -> @location(0) vec4f {
     var normalWV = normalize((camera.viewMatrix * vec4<f32>(normalize(normal), 0.0f)).xyz);
     var normalW = normalize(normal);
@@ -126,9 +141,7 @@ fn fragmentMain(
         vec4<f32>(0.0, 0.0, 0.0, 1.0)
     );
 
-    let shadow = ShadowCalculation(posShadow, normalW);
-    //color = lighting.diffuse + lighting.specular + (u_shadowIntensity - shadow) *  lighting.ambient;
-    //color = (2.0f - shadow) * (lighting.diffuse + lighting.specular) + lighting.ambient;
+    let shadow = ShadowCalculation(posShadow, positionW, normalW);
 
     if(directionalLight.enabled > 0){
         var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz), false);
@@ -137,10 +150,5 @@ fn fragmentMain(
         lighting.ambient += l.ambient;
     }
 
-    return lighting.ambient + lighting.diffuse * shadow + lighting.specular;
-    
-    //let proj = (posShadow.xyz / posShadow.w) * 0.5 + 0.5;
-    //return vec4f(proj, 1.0);
-
-    //return vec4f(vec3f(shadow), 1.0);
+    return lighting.ambient + lighting.diffuse * shadow + lighting.specular * shadow;
 }
