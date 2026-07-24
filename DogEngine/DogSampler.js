@@ -4,27 +4,25 @@
  * @version 1.0
  */
 class DogSampler extends DogResource {
+
     /**
      * Initializes a new instance of the DogSampler class.
-     * @param {object} config Configuration object for the sampler.
-     * @param {string} config.addressModeU Address mode for the U-axis.
-     * @param {string} config.addressModeV Address mode for the V-axis.
-     * @param {string} config.magFilter Magnification filter.
-     * @param {string} config.minFilter Minification filter.
-     * @param {string} config.mipmapFilter Mipmap filter.
+     * @param {object} descriptor Configuration object for the sampler.
+     * @param {string} descriptor.addressModeU Address mode for the U-axis.
+     * @param {string} descriptor.addressModeV Address mode for the V-axis.
+     * @param {string} descriptor.magFilter Magnification filter.
+     * @param {string} descriptor.minFilter Minification filter.
+     * @param {string} descriptor.mipmapFilter Mipmap filter.
+     * @param {string} descriptor.compare Compare mode.
      */
-    constructor(name, config = {}) {
+    constructor(name, descriptor) {
         super(name);
 
         this.name = name;
 
-        this.sampler = pGraphics.device.createSampler({
-            addressModeU: config.addressModeU || 'repeat',
-            addressModeV: config.addressModeV || 'repeat',
-            magFilter: config.magFilter || 'linear',
-            minFilter: config.minFilter || 'linear',
-            mipmapFilter: config.mipmapFilter || 'linear',
-        });
+        descriptor.label = name;
+
+        this.sampler = pGraphics.device.createSampler(descriptor);
     }
 
     /**
@@ -47,7 +45,7 @@ class DogSampler extends DogResource {
      * Gets the sampler.
      * @returns {GPUSampler} The sampler.
      */
-    getGPUSampler() {
+    getWebGPUSampler() {
         return this.sampler;
     }
 }

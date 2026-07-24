@@ -15,7 +15,7 @@ class DogShape {
      * Creates a new DogShape instance. This class is not meant to be instantiated, 
      * but to be used as a static class to create procedural meshes.
      */
-    constructor(){
+    constructor() {
 
     }
 
@@ -25,10 +25,10 @@ class DogShape {
      * @param {float} descriptor.width - Width of the cube (x).
      * @param {float} descriptor.height - Height of the cube (y).
      * @param {float} descriptor.depth - Depth of the cube (z).
-     * @param {DogBoundingVolumeEnums.Type} descriptor.BoundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
+     * @param {DogBoundingVolumeEnums.Type} descriptor.boundingVolumeType Type of bounding volume to create for the cube (Box or Sphere).
      * @returns {DogStaticMesh} Cube with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
-    createCube(descriptor){
+    createCube(descriptor) {
         const idVb = "DogCubeVBw" + descriptor.width + "h" + descriptor.height + "d" + descriptor.depth;
         const idIb = "DogCubeIBw" + descriptor.width + "h" + descriptor.height + "d" + descriptor.depth;
 
@@ -45,42 +45,42 @@ class DogShape {
         const numIndices = 36;
 
         var w2 = 0.5 * descriptor.width;
-		var h2 = 0.5 * descriptor.height;
-		var d2 = 0.5 * descriptor.depth;
+        var h2 = 0.5 * descriptor.height;
+        var d2 = 0.5 * descriptor.depth;
 
-        if(resource == null) {
+        if (resource == null) {
             // position(3), normal(3), texture(2), 
             var _vertices = new Float32Array([
                 //Front
                 -w2, -h2, d2, 0.0, 0.0, 1.0, 0.0, 1.0, //0
                 w2, -h2, d2, 0.0, 0.0, 1.0, 1.0, 1.0, //1
-                w2,  h2, d2, 0.0, 0.0, 1.0, 1.0, 0.0, //2
-                -w2,  h2, d2, 0.0, 0.0, 1.0, 0.0, 0.0, //3
+                w2, h2, d2, 0.0, 0.0, 1.0, 1.0, 0.0, //2
+                -w2, h2, d2, 0.0, 0.0, 1.0, 0.0, 0.0, //3
                 //Right
-                w2, -h2,  d2, 1.0, 0.0, 0.0, 0.0, 1.0, //4
+                w2, -h2, d2, 1.0, 0.0, 0.0, 0.0, 1.0, //4
                 w2, -h2, -d2, 1.0, 0.0, 0.0, 1.0, 1.0, //5
-                w2,  h2, -d2, 1.0, 0.0, 0.0, 1.0, 0.0, //6
-                w2,  h2,  d2, 1.0, 0.0, 0.0, 0.0, 0.0, //7
+                w2, h2, -d2, 1.0, 0.0, 0.0, 1.0, 0.0, //6
+                w2, h2, d2, 1.0, 0.0, 0.0, 0.0, 0.0, //7
                 //Back
                 w2, -h2, -d2, 0.0, 0.0, -1.0, 0.0, 1.0, //8
                 -w2, -h2, -d2, 0.0, 0.0, -1.0, 1.0, 1.0, //9
-                -w2,  h2, -d2, 0.0, 0.0, -1.0, 1.0, 0.0, //10
-                w2,  h2, -d2, 0.0, 0.0, -1.0, 0.0, 0.0, //11
+                -w2, h2, -d2, 0.0, 0.0, -1.0, 1.0, 0.0, //10
+                w2, h2, -d2, 0.0, 0.0, -1.0, 0.0, 0.0, //11
                 //Left
                 -w2, -h2, -d2, -1.0, 0.0, 0.0, 0.0, 1.0, //12
-                -w2, -h2,  d2, -1.0, 0.0, 0.0, 1.0, 1.0, //13
-                -w2,  h2,  d2, -1.0, 0.0, 0.0, 1.0, 0.0, //14
-                -w2,  h2, -d2, -1.0, 0.0, 0.0, 0.0, 0.0, //15
+                -w2, -h2, d2, -1.0, 0.0, 0.0, 1.0, 1.0, //13
+                -w2, h2, d2, -1.0, 0.0, 0.0, 1.0, 0.0, //14
+                -w2, h2, -d2, -1.0, 0.0, 0.0, 0.0, 0.0, //15
                 //Top
-                -w2,  h2,  d2, 0.0, 1.0, 0.0, 0.0, 1.0, //16
-                w2,  h2,  d2, 0.0, 1.0, 0.0, 1.0, 1.0, //17
-                w2,  h2, -d2, 0.0, 1.0, 0.0, 1.0, 0.0, //18
-                -w2,  h2, -d2, 0.0, 1.0, 0.0, 0.0, 0.0, //19
+                -w2, h2, d2, 0.0, 1.0, 0.0, 0.0, 1.0, //16
+                w2, h2, d2, 0.0, 1.0, 0.0, 1.0, 1.0, //17
+                w2, h2, -d2, 0.0, 1.0, 0.0, 1.0, 0.0, //18
+                -w2, h2, -d2, 0.0, 1.0, 0.0, 0.0, 0.0, //19
                 //Bottom
                 -w2, -h2, -d2, 0.0, -1.0, 0.0, 0.0, 1.0, //20
                 w2, -h2, -d2, 0.0, -1.0, 0.0, 1.0, 1.0, //21
-                w2, -h2,  d2, 0.0, -1.0, 0.0, 1.0, 0.0, //22
-                -w2, -h2,  d2, 0.0, -1.0, 0.0, 0.0, 0.0  //23
+                w2, -h2, d2, 0.0, -1.0, 0.0, 1.0, 0.0, //22
+                -w2, -h2, d2, 0.0, -1.0, 0.0, 0.0, 0.0  //23
             ]);
 
             var indices = new Uint16Array([
@@ -98,7 +98,7 @@ class DogShape {
                 20, 21, 22, 20, 22, 23
             ]);
 
-            let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+            let vertexFormat = { "in_position": 3, "in_normal": 3, "in_texcoord": 2 };
 
             webGPUengine.createDogBuffer(idVb, BufferType.Vertex, _vertices, 0, true);
             webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
@@ -119,7 +119,7 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: [-w2, -h2, -d2], vmax: [w2, h2, d2] }));
         }
 
@@ -134,7 +134,7 @@ class DogShape {
      * @param {int} descriptor.slices Number of divisions in z.
      * @returns {DogStaticMesh} Sphere with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
-    createSphere(descriptor){
+    createSphere(descriptor) {
         const idVb = "DogSphereVBr" + descriptor.radio + "st" + descriptor.stacks + "sl" + descriptor.slices;
         const idIb = "DogSphereIBr" + descriptor.radio + "st" + descriptor.stacks + "sl" + descriptor.slices;
 
@@ -150,7 +150,7 @@ class DogShape {
         const numVerts = (descriptor.stacks - 1) * (descriptor.slices + 1) + 2;
         const numIndices = 6 * descriptor.slices * (descriptor.stacks - 1);
 
-        if(resource == null) {
+        if (resource == null) {
             var _vertices = [];
 
             //position
@@ -168,17 +168,15 @@ class DogShape {
             var phiStep = Math.PI / descriptor.stacks;
             var thetaStep = 2.0 * Math.PI / descriptor.slices;
 
-            for (var i = 1; i <= descriptor.stacks - 1; ++i)
-            {
+            for (var i = 1; i <= descriptor.stacks - 1; ++i) {
                 var phi = i * phiStep;
-        
+
                 // _vertices of ring.
-                for (var j = 0; j <= descriptor.slices; ++j)
-                {
+                for (var j = 0; j <= descriptor.slices; ++j) {
                     var theta = j * thetaStep;
 
                     var verts = [
-                        descriptor.radio * Math.sin(phi) * Math.cos(theta), 
+                        descriptor.radio * Math.sin(phi) * Math.cos(theta),
                         descriptor.radio * Math.cos(phi),
                         descriptor.radio * Math.sin(phi) * Math.sin(theta)
                     ];
@@ -218,48 +216,44 @@ class DogShape {
             // and connects the top pole to the first ring.
             //
             var _indices = [];
-            for (var i = 1; i <= descriptor.slices; ++i)
-            {
+            for (var i = 1; i <= descriptor.slices; ++i) {
                 _indices.push(0);
                 _indices.push(i + 1);
                 _indices.push(i);
             }
-        
+
             //
             // Compute _indices for inner stacks (not connected to poles).
             //
-        
+
             // Offset the _indices to the index of the first vertex in the first ring.
             // This is just skipping the top pole vertex.
             var baseIndex = 1;
             var ringVertexCount = descriptor.slices + 1;
-            for (var i = 0; i < descriptor.stacks - 2; ++i)
-            {
-                for (var j = 0; j < descriptor.slices; ++j)
-                {
+            for (var i = 0; i < descriptor.stacks - 2; ++i) {
+                for (var j = 0; j < descriptor.slices; ++j) {
                     _indices.push(baseIndex + i * ringVertexCount + j);
                     _indices.push(baseIndex + i * ringVertexCount + j + 1);
                     _indices.push(baseIndex + (i + 1) * ringVertexCount + j);
-        
+
                     _indices.push(baseIndex + (i + 1) * ringVertexCount + j);
                     _indices.push(baseIndex + i * ringVertexCount + j + 1);
                     _indices.push(baseIndex + (i + 1) * ringVertexCount + j + 1);
                 }
             }
-        
+
             /**
             * Compute indices for bottom stack.  The bottom stack was written last to the vertex buffer
             * and connects the bottom pole to the bottom ring.
             */
-        
+
             // South pole vertex was added last.
             var southPoleIndex = _vertices.length / 8 - 1;
-        
+
             // Offset the _indices to the index of the first vertex in the last ring.
             baseIndex = southPoleIndex - ringVertexCount;
-        
-            for (var i = 0; i < descriptor.slices; ++i)
-            {
+
+            for (var i = 0; i < descriptor.slices; ++i) {
                 _indices.push(southPoleIndex);
                 _indices.push(baseIndex + i);
                 _indices.push(baseIndex + i + 1);
@@ -267,7 +261,7 @@ class DogShape {
 
             var indices = new Uint16Array(_indices);
 
-            let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+            let vertexFormat = { "in_position": 3, "in_normal": 3, "in_texcoord": 2 };
 
             webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
             webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
@@ -282,9 +276,14 @@ class DogShape {
         staticMesh.setIdVertexBuffer(idVb);
         staticMesh.setIdIndexBuffer(idIb);
 
-        if(descriptor.BoundingVolumeType === BoundingVolumeType.Sphere){
-            mesh.setBoundingVolume(new DogBoundingSphere({ position: [0.0, 0.0, 0.0], radio: descriptor.radio }));
-        } 
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Sphere) {
+            mesh.setBoundingVolume(new DogBoundingSphere({
+                position: [0.0, 0.0, 0.0],
+                radio: descriptor.radio,
+                vmin: [-descriptor.radio, -descriptor.radio, -descriptor.radio],
+                vmax: [descriptor.radio, descriptor.radio, descriptor.radio]
+            }));
+        }
 
         return staticMesh;
     }
@@ -299,7 +298,7 @@ class DogShape {
      * @param {float} texScale - Scale of texture coordinates.
      * @returns {DogStaticMesh} Grid with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
-    createGrid(descriptor){
+    createGrid(descriptor) {
         const idVb = "DogGridVBvr" + descriptor.numVertRows + "vc" + descriptor.numVertCols + "d" + descriptor.delta[0] + descriptor.delta[1] + descriptor.delta[2] + "t" + descriptor.texScale;
         const idIb = "DogGridIBvr" + descriptor.numVertRows + "vc" + descriptor.numVertCols + "d" + descriptor.delta[0] + descriptor.delta[1] + descriptor.delta[2] + "t" + descriptor.texScale;
 
@@ -315,7 +314,7 @@ class DogShape {
         var numVertices = descriptor.numVertRows * descriptor.numVertCols;
         var numIndices = (descriptor.numVertRows - 1) * (descriptor.numVertCols - 1) * 6;
 
-        if(resource == null) {
+        if (resource == null) {
 
             var numCellRows = descriptor.numVertRows - 1;
             var numCellCols = descriptor.numVertCols - 1;
@@ -330,14 +329,12 @@ class DogShape {
 
             var _vertices = [];
 
-            for (var i = 0; i < descriptor.numVertRows; ++i)
-            {
-                for (var j = 0; j < descriptor.numVertCols; ++j)
-                {
+            for (var i = 0; i < descriptor.numVertRows; ++i) {
+                for (var j = 0; j < descriptor.numVertCols; ++j) {
                     _vertices.push(xZero + j * descriptor.delta[0]);
                     _vertices.push(descriptor.position[1]);
                     _vertices.push(zZero + i * -descriptor.delta[2]);
-                    
+
                     _vertices.push(0.0);
                     _vertices.push(1.0);
                     _vertices.push(0.0);
@@ -354,10 +351,8 @@ class DogShape {
 
             // Generate indices for each quad.
             var k = 0;
-            for (var i = 0; i < numCellRows; ++i)
-            {
-                for (var j = 0; j < numCellCols; ++j)
-                {
+            for (var i = 0; i < numCellRows; ++i) {
+                for (var j = 0; j < numCellCols; ++j) {
                     _indices[k] = i * descriptor.numVertCols + j;
                     _indices[k + 1] = i * descriptor.numVertCols + j + 1;
                     _indices[k + 2] = (i + 1) * descriptor.numVertCols + j;
@@ -374,7 +369,7 @@ class DogShape {
             var vertices = new Float32Array(_vertices);
             var indices = new Uint16Array(_indices);
 
-            let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
+            let vertexFormat = { "in_position": 3, "in_normal": 3, "in_texcoord": 2 };
 
             webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
             webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
@@ -403,7 +398,7 @@ class DogShape {
      * @param {float} descriptor.height - Height.
      * @returns {DogStaticMesh} Cylinder with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
-    createCylinder(descriptor){
+    createCylinder(descriptor) {
         const idVb = "DogCylinderVBst" + descriptor.stacks + "sl" + descriptor.slices + "br" + descriptor.bottomRadio + "tr" + descriptor.topRadio + "h" + descriptor.height;
         const idIb = "DogCylinderIBst" + descriptor.stacks + "sl" + descriptor.slices + "br" + descriptor.bottomRadio + "tr" + descriptor.topRadio + "h" + descriptor.height;
 
@@ -422,7 +417,7 @@ class DogShape {
         var vmin = [Infinity, Infinity, Infinity];
         var vmax = [-Infinity, -Infinity, -Infinity];
 
-        if(resource == null) {
+        if (resource == null) {
             //
             // Build Stacks.
             // 
@@ -438,15 +433,13 @@ class DogShape {
             var _vertices = [];
 
             // Compute vertices for each stack ring starting at the bottom and moving up.
-            for (var i = 0; i < ringCount; ++i)
-            {
+            for (var i = 0; i < ringCount; ++i) {
                 var y = -0.5 * descriptor.height + i * stackHeight;
                 var r = descriptor.bottomRadio + i * radioStep;
-        
+
                 // vertices of ring
                 var theta = 2.0 * Math.PI / descriptor.slices;
-                for (var j = 0; j <= descriptor.slices; ++j)
-                {
+                for (var j = 0; j <= descriptor.slices; ++j) {
                     var c = Math.cos(j * theta);
                     var s = Math.sin(j * theta);
 
@@ -507,10 +500,8 @@ class DogShape {
             var _indices = [];
 
             // Compute indices for each stack.
-            for (var i = 0; i < descriptor.stacks; ++i)
-            {
-                for (var j = 0; j < descriptor.slices; ++j)
-                {
+            for (var i = 0; i < descriptor.stacks; ++i) {
+                for (var j = 0; j < descriptor.slices; ++j) {
                     _indices.push(i * ringVertexCount + j);
                     _indices.push((i + 1) * ringVertexCount + j);
                     _indices.push((i + 1) * ringVertexCount + j + 1);
@@ -520,7 +511,7 @@ class DogShape {
                     _indices.push(i * ringVertexCount + j + 1);
                 }
             }
-            
+
             this.BuildCylinderTopCap(descriptor, _vertices, _indices, numVertices);
 
             numVertices = (descriptor.stacks + 1) * (descriptor.slices + 1) + (descriptor.slices + 2);
@@ -530,8 +521,8 @@ class DogShape {
             var vertices = new Float32Array(_vertices);
             var indices = new Uint16Array(_indices);
 
-            let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
-            
+            let vertexFormat = { "in_position": 3, "in_normal": 3, "in_texcoord": 2 };
+
             webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
             webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
         }
@@ -551,7 +542,7 @@ class DogShape {
         /*var smoothNormalBuffer = webGLengine.createVertexBuffer(smoothNormals);
         mesh.submeshes[0].setSmoothNormalBuffer(smoothNormalBuffer);*/
 
-        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
@@ -565,15 +556,14 @@ class DogShape {
      * @param {Array} indices - List of indices
      * @param {int} numVertices - Number of vertices in the moment no total pre-calculated
      */
-    BuildCylinderTopCap(descriptor, vertices, indices, numVertices){
+    BuildCylinderTopCap(descriptor, vertices, indices, numVertices) {
         var baseIndex = numVertices;
 
         var y = 0.5 * descriptor.height;
         var theta = 2.0 * Math.PI / descriptor.slices;
 
         // Duplicate cap ring vertices because the texture coordinates and normals differ.
-        for (var i = 0; i <= descriptor.slices; ++i)
-        {
+        for (var i = 0; i <= descriptor.slices; ++i) {
             var x = descriptor.topRadio * Math.cos(i * theta);
             var z = descriptor.topRadio * Math.sin(i * theta);
 
@@ -583,16 +573,16 @@ class DogShape {
             var v = z / descriptor.height + 0.5;
 
             //position
-			vertices.push(x);
-			vertices.push(y);
-			vertices.push(z);
+            vertices.push(x);
+            vertices.push(y);
+            vertices.push(z);
             //normal
-			vertices.push(0.0);
-			vertices.push(1.0);
-			vertices.push(0.0);
+            vertices.push(0.0);
+            vertices.push(1.0);
+            vertices.push(0.0);
             //uv
             vertices.push(u);
-			vertices.push(v);
+            vertices.push(v);
 
             numVertices++;
         }
@@ -602,15 +592,14 @@ class DogShape {
         //normal
         vertices.push(0.0, 1.0, 0.0);
         //uv
-		vertices.push(0.5, 0.5);
+        vertices.push(0.5, 0.5);
 
         numVertices++;
 
         // Index of center vertex.
         var centerIndex = numVertices - 1;
 
-        for (var i = 0; i < descriptor.slices; ++i)
-        {
+        for (var i = 0; i < descriptor.slices; ++i) {
             indices.push(centerIndex);
             indices.push(baseIndex + i + 1);
             indices.push(baseIndex + i);
@@ -624,7 +613,7 @@ class DogShape {
      * @param {Array} indices - List of indices
      * @param {int} numVertices - Number of vertices in the moment no total pre-calculated
      */
-    BuildCylinderBottomCap(descriptor, vertices, indices, numVertices){
+    BuildCylinderBottomCap(descriptor, vertices, indices, numVertices) {
         // 
         // Build bottom cap.
         //
@@ -633,43 +622,41 @@ class DogShape {
 
         // vertices of ring
         var theta = 2.0 * Math.PI / descriptor.slices;
-        for (var i = 0; i <= descriptor.slices; ++i)
-        {
+        for (var i = 0; i <= descriptor.slices; ++i) {
             var x = descriptor.bottomRadio * Math.cos(i * theta);
             var z = descriptor.bottomRadio * Math.sin(i * theta);
 
             // Scale down by the height to try and make top cap texture coord area
-			// proportional to base.
-			var u = x / descriptor.height + 0.5;
-			var v = z / descriptor.height + 0.5;
+            // proportional to base.
+            var u = x / descriptor.height + 0.5;
+            var v = z / descriptor.height + 0.5;
 
             //position
-			vertices.push(x);
-			vertices.push(y);
-			vertices.push(z);
+            vertices.push(x);
+            vertices.push(y);
+            vertices.push(z);
             //normal
-			vertices.push(0.0);
-			vertices.push(-1.0);
-			vertices.push(0.0);
+            vertices.push(0.0);
+            vertices.push(-1.0);
+            vertices.push(0.0);
             //texcoords
             vertices.push(u);
-			vertices.push(v);
-			
+            vertices.push(v);
+
             numVertices++;
         }
 
         //position
         vertices.push(0.0, y, 0.0);
-		//uv
-		vertices.push(0.5, 0.5);
+        //uv
+        vertices.push(0.5, 0.5);
         //normal
         vertices.push(0.0, -1.0, 0.0);
 
         // Cache the index of center vertex.
         var centerIndex = numVertices;
 
-        for (var i = 0; i < descriptor.slices; ++i)
-        {
+        for (var i = 0; i < descriptor.slices; ++i) {
             indices.push(centerIndex);
             indices.push(baseIndex + i);
             indices.push(baseIndex + i + 1);
@@ -685,7 +672,7 @@ class DogShape {
      * @param {int} descriptor.tubularSegments - Number of segments in the tubular direction.
      * @returns {DogStaticMesh} Torus with vertex format { position: 3, normal: 3, texture coords: 2 }
      */
-    createTorus(descriptor){
+    createTorus(descriptor) {
         const idVb = "DogTorusVBr" + descriptor.radio + "tr" + descriptor.tuberadio + "rs" + descriptor.radialSegments + "ts" + descriptor.tubularSegments;
         const idIb = "DogTorusIBr" + descriptor.radio + "tr" + descriptor.tuberadio + "rs" + descriptor.radialSegments + "ts" + descriptor.tubularSegments;
 
@@ -707,8 +694,8 @@ class DogShape {
         var _vertices = []; // It'll store: [x, y, z, nx, ny, nz, u, v, ...]
         var _indices = [];
 
-        
-        if(resource == null) {
+
+        if (resource == null) {
             // Generar vértices con normales y UVs
             for (let j = 0; j <= descriptor.radialSegments; j++) {
                 for (let i = 0; i <= descriptor.tubularSegments; i++) {
@@ -730,8 +717,8 @@ class DogShape {
                     const tu = i / descriptor.tubularSegments;
                     const tv = j / descriptor.radialSegments;
 
-                    glMatrix.vec3.min(vmin, vmin, [x,y,z]);
-                    glMatrix.vec3.max(vmax, vmax, [x,y,z]);
+                    glMatrix.vec3.min(vmin, vmin, [x, y, z]);
+                    glMatrix.vec3.max(vmax, vmax, [x, y, z]);
 
                     _vertices.push(x, y, z, nx, ny, nz, tu, tv);
                 }
@@ -753,8 +740,8 @@ class DogShape {
             var vertices = new Float32Array(_vertices);
             var indices = new Uint16Array(_indices);
 
-            let vertexFormat = { "in_position" : 3, "in_normal" : 3, "in_texcoord" : 2 };
-;
+            let vertexFormat = { "in_position": 3, "in_normal": 3, "in_texcoord": 2 };
+            ;
             webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
             webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
         }
@@ -763,7 +750,7 @@ class DogShape {
         mesh.setNumVertices(numVerts);
         mesh.setNumIndices(numIndices);
 
-        if(descriptor.BoundingVolumeType === BoundingVolumeType.Box){
+        if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
             mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
         }
 
@@ -771,6 +758,167 @@ class DogShape {
         staticMesh.addMesh(mesh);
         staticMesh.setIdVertexBuffer(idVb);
         staticMesh.setIdIndexBuffer(idIb);
+
+        return staticMesh;
+    }
+
+    /**
+     * Create a Cornell Box mesh with standard dimensions.
+     * @param {JSON object} descriptor - Descriptor of the Cornell Box.
+     * @param {DogBoundingVolumeEnums.Type} descriptor.boundingVolumeType Type of bounding volume to create for the meshes.
+     * @returns {DogStaticMesh} Cornell Box with vertex format { position: 3, normal: 3, texture coords: 2 }
+     * 
+     * @author Gemini 3 Pro High
+     */
+    createCornellBox(descriptor = {}) {
+        const idVb = "DogCornellBoxVB";
+        const idIb = "DogCornellBoxIB";
+
+        var resource = null;
+
+        try {
+            resource = resourceManager.get(idVb);
+            resource.addReference();
+        } catch (error) {
+            resource = null;
+        }
+
+        const numMeshes = 7;
+
+        // We will build:
+        // 0: Floor (4 verts, 6 indices)
+        // 1: Ceiling (4 verts, 6 indices)
+        // 2: Back Wall (4 verts, 6 indices)
+        // 3: Left Wall (4 verts, 6 indices)
+        // 4: Right Wall (4 verts, 6 indices)
+        // 5: Front Wall (4 verts, 6 indices)
+        // 6: Light (4 verts, 6 indices)
+
+        const meshVertexCounts = [4, 4, 4, 4, 4, 4, 4];
+        const meshIndexCounts = [6, 6, 6, 6, 6, 6, 6];
+
+        if (resource == null) {
+            var _vertices = [];
+            var _indices = [];
+
+            // Helper to add a quad
+            function addQuad(v0, v1, v2, v3, normal, uvs) {
+                _vertices.push(v0[0], v0[1], v0[2], normal[0], normal[1], normal[2], uvs[0][0], uvs[0][1]);
+                _vertices.push(v1[0], v1[1], v1[2], normal[0], normal[1], normal[2], uvs[1][0], uvs[1][1]);
+                _vertices.push(v2[0], v2[1], v2[2], normal[0], normal[1], normal[2], uvs[2][0], uvs[2][1]);
+                _vertices.push(v3[0], v3[1], v3[2], normal[0], normal[1], normal[2], uvs[3][0], uvs[3][1]);
+
+                _indices.push(0, 1, 2, 0, 2, 3);
+            }
+
+            // 1. Floor
+            addQuad(
+                [-277.5, 0.0, 277.5], [277.5, 0.0, 277.5], [277.5, 0.0, -277.5], [-277.5, 0.0, -277.5],
+                [0.0, 1.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 2. Ceiling
+            addQuad(
+                [-277.5, 555.0, 277.5], [-277.5, 555.0, -277.5], [277.5, 555.0, -277.5], [277.5, 555.0, 277.5],
+                [0.0, -1.0, 0.0],
+                [[0, 1], [0, 0], [1, 0], [1, 1]]
+            );
+
+            // 3. Back Wall
+            addQuad(
+                [-277.5, 0.0, -277.5], [277.5, 0.0, -277.5], [277.5, 555.0, -277.5], [-277.5, 555.0, -277.5],
+                [0.0, 0.0, 1.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 4. Left Wall (Red)
+            addQuad(
+                [-277.5, 0.0, 277.5], [-277.5, 0.0, -277.5], [-277.5, 555.0, -277.5], [-277.5, 555.0, 277.5],
+                [1.0, 0.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 5. Right Wall (Green)
+            addQuad(
+                [277.5, 0.0, -277.5], [277.5, 0.0, 277.5], [277.5, 555.0, 277.5], [277.5, 555.0, -277.5],
+                [-1.0, 0.0, 0.0],
+                [[0, 1], [1, 1], [1, 0], [0, 0]]
+            );
+
+            // 6. Front Wall (at Z = 277.5, normal pointing inside: [0.0, 0.0, -1.0])
+            addQuad(
+                [277.5, 0.0, 277.5], [-277.5, 0.0, 277.5], [-277.5, 555.0, 277.5], [277.5, 555.0, 277.5],
+                [0.0, 0.0, -1.0],
+                [[1, 1], [0, 1], [0, 0], [1, 0]]
+            );
+
+            // 7. Light Source
+            addQuad(
+                [-65.0, 554.0, 52.5], [-65.0, 554.0, -52.5], [65.0, 554.0, -52.5], [65.0, 554.0, 52.5],
+                [0.0, -1.0, 0.0],
+                [[0, 1], [0, 0], [1, 0], [1, 1]]
+            );
+
+            var vertices = new Float32Array(_vertices);
+            var indices = new Uint16Array(_indices);
+
+            webGPUengine.createDogBuffer(idVb, BufferType.Vertex, vertices, 0, true);
+            webGPUengine.createDogBuffer(idIb, BufferType.Index, indices, 0, true);
+        }
+
+        var staticMesh = new DogStaticMesh();
+        staticMesh.setIdVertexBuffer(idVb);
+        staticMesh.setIdIndexBuffer(idIb);
+
+        const meshNames = ["floor", "ceiling", "back_wall", "left_wall", "right_wall", "front_wall", "light"];
+
+        let vertexOffset = 0;
+        let indexOffset = 0;
+
+        for (let i = 0; i < numMeshes; i++) {
+            var mesh = new DogMesh(meshNames[i]);
+            mesh.setNumVertices(meshVertexCounts[i]);
+            mesh.setNumIndices(meshIndexCounts[i]);
+            mesh.setFirstIndex(indexOffset);
+            mesh.setBaseVertex(vertexOffset);
+
+            if (descriptor.boundingVolumeType === BoundingVolumeType.Box) {
+                // Calculate bounding box for this submesh
+                let vmin = [Infinity, Infinity, Infinity];
+                let vmax = [-Infinity, -Infinity, -Infinity];
+
+                if (i === 0) { // Floor
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [277.5, 0.0, 277.5];
+                } else if (i === 1) { // Ceiling
+                    vmin = [-277.5, 555.0, -277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 2) { // Back Wall
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [277.5, 555.0, -277.5];
+                } else if (i === 3) { // Left Wall
+                    vmin = [-277.5, 0.0, -277.5];
+                    vmax = [-277.5, 555.0, 277.5];
+                } else if (i === 4) { // Right Wall
+                    vmin = [277.5, 0.0, -277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 5) { // Front Wall
+                    vmin = [-277.5, 0.0, 277.5];
+                    vmax = [277.5, 555.0, 277.5];
+                } else if (i === 6) { // Light
+                    vmin = [-65.0, 554.0, -52.5];
+                    vmax = [65.0, 554.0, 52.5];
+                }
+
+                mesh.setBoundingVolume(new DogBoundingBox({ vmin: vmin, vmax: vmax }));
+            }
+
+            staticMesh.addMesh(mesh);
+
+            vertexOffset += meshVertexCounts[i];
+            indexOffset += meshIndexCounts[i];
+        }
 
         return staticMesh;
     }

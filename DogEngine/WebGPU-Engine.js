@@ -30,7 +30,6 @@ include("/DogEngine/DogMaterial.js");
 include("/DogEngine/DogTransform.js");
 include("/DogEngine/DogMesh.js");
 
-
 include("/DogEngine/DogResourceManager.js");
 include("/DogEngine/bounding/DogBoundingVolume.js");
 include("/DogEngine/bounding/DogBoundingSphere.js");
@@ -137,6 +136,44 @@ const GPUVisibility = Object.freeze({
             format: canvasFormat,
         });
 
+        /******
+         // Get the device pixel ratio (default to 1 if undefined)
+            const dpr = window.devicePixelRatio || 1;
+
+            // Calculate actual screen pixel dimensions
+            const width = Math.floor(canvas.clientWidth * dpr);
+            const height = Math.floor(canvas.clientHeight * dpr);
+
+            // Update canvas internal drawing buffer size
+            canvas.width = width;
+            canvas.height = height;
+
+            // Configure your WebGPU context texture size
+            const context = canvas.getContext("webgpu");
+            context.configure({
+                device: device,
+                format: navigator.gpu.getPreferredCanvasFormat(),
+                alphaMode: 'opaque',
+                size: [width, height], // Must match canvas.width/height
+            });
+
+            const resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    // Math.floor prevents subpixel rounding bugs
+                    const dpr = window.devicePixelRatio || 1;
+                    const width = Math.floor(entry.contentRect.width * dpr);
+                    const height = Math.floor(entry.contentRect.height * dpr);
+        
+                    // Trigger your WebGPU canvas.width/height update 
+                    // and re-run context.configure() with the new size
+                    resizeCanvasAndStorageTextures(width, height);
+                }
+            });
+
+            // Watch your canvas element
+            resizeObserver.observe(canvas);
+         */
+
         const info = adapter.info;
         console.log(`Dog Engine - Vendor: ${info.vendor}`);      // Ej: "nvidia" o "intel"
         console.log(`Dog Engine - Architecture: ${info.architecture}`);
@@ -154,9 +191,8 @@ const GPUVisibility = Object.freeze({
 
     /**
      * Create bind groups based on the input JSON configuration.
-     * @param {JSON Object} groups - An array of configuration objects, each containing
-     *                               group, binding, and entry information for creating
-     *                               bind groups.
+     * @param {string} id - Name or Id of the bind group.
+     * @param {JSON Object} descriptor - Descriptor for creating the bind group.
      * @returns {string} The name of the bind group.
      */
     function createBindGroup(id, descriptor) {
@@ -198,6 +234,8 @@ const GPUVisibility = Object.freeze({
             let bindGroupLayout = pGraphics.device.createBindGroupLayout(descriptor);
             resourceManager.addBindGroupLayout(group, bindGroupLayout);
         }
+
+        return parsed;
     }
 
     /**
@@ -257,6 +295,8 @@ const GPUVisibility = Object.freeze({
 
                 return "-1";
             }
+        } else {
+            return buffer;
         }
 
         return name;
@@ -363,7 +403,7 @@ const GPUVisibility = Object.freeze({
         );
 
         texture = new DogTexture(name);
-        texture.setGPUTexture(gpuTexture);
+        texture.setWebGPUTexture(gpuTexture);
         texture.setWidthAndHeight(imageBitmap.width, imageBitmap.height);
         texture.setFormat(gpuTexture.format);
         texture.addReference();
@@ -400,9 +440,34 @@ const GPUVisibility = Object.freeze({
         );
 
         texture = new DogTexture(name);
-        texture.setGPUTexture(gpuTexture);
+        texture.setWebGPUTexture(gpuTexture);
         texture.setWidthAndHeight(1, 1);
         texture.setFormat(gpuTexture.format);
+        texture.addReference();
+
+        resourceManager.add(name, texture);
+
+        return texture;
+    }
+
+    /**
+     * Creates a dog texture.
+     * @param {string} name Name/Id of the texture (id of the resource).
+     * @param {GPUTextureDescriptor} descriptor The descriptor of the texture.
+     * @returns {DogTexture} The texture.
+     */
+    function createDogTexture(name, descriptor) {
+        const gpuTexture = pGraphics.device.createTexture({
+            label: name,
+            size: descriptor.size,
+            format: descriptor.format,
+            usage: descriptor.usage,
+        });
+
+        const texture = new DogTexture(name);
+        texture.setWebGPUTexture(gpuTexture);
+        texture.setWidthAndHeight(descriptor.size[0], descriptor.size[1]);
+        texture.setFormat(descriptor.format);
         texture.addReference();
 
         resourceManager.add(name, texture);
@@ -447,28 +512,38 @@ const GPUVisibility = Object.freeze({
      * Create a DogSampler and stores in the resource manager. If the sampler already exists in the resource manager, 
      * increase the number of references and it will be returned.
      * @param {string} name Name/Id of the sampler (id of the resource).
-     * @param {object} config Configuration of the sampler. 
-     *                      The configuration object has the following properties:
-     * @param config.addressModeU {string} Address mode for the U coordinate. (default: "")
-     * @param config.addressModeV {string} Address mode for the V coordinate. (default: "")
-     * @param config.magFilter {string} Magnification filter. (default: "")
-     * @param config.minFilter {string} Minification filter. (default: "")
-     * @param config.mipmapFilter {string} Mipmap filter. (default: "")
+     * @param {object} descriptor Configuration of the sampler. 
+     *                      The descriptor object has the following properties:
+     * @param descriptor.addressModeU {string} Address mode for the U coordinate. (default: "")
+     * @param descriptor.addressModeV {string} Address mode for the V coordinate. (default: "")
+     * @param descriptor.magFilter {string} Magnification filter. (default: "")
+     * @param descriptor.minFilter {string} Minification filter. (default: "")
+     * @param descriptor.mipmapFilter {string} Mipmap filter. (default: "")
+     * @param descriptor.compare {string} Comparison function. (default: undefined)
      * @returns {DogSampler} The sampler if the creation and stores in the resource manager is ok, null otherwise.
      */
-    function createDogSampler(name, config = {}) {
-        const amu = config.addressModeU || "";
-        const amv = config.addressModeV || "";
-        const maf = config.magFilter || "";
-        const mif = config.minFilter || "";
-        const mm = config.mipmapFilter || "";
+    function createDogSampler(name, descriptor = {}) {
+        const amu = descriptor.addressModeU || "";
+        const amv = descriptor.addressModeV || "";
+        const maf = descriptor.magFilter || "";
+        const mif = descriptor.minFilter || "";
+        const mm = descriptor.mipmapFilter || "";
+        const compare = descriptor.compare || "";
 
         if (name === undefined || name == null || name == "") {
-            name = "amu-" + amu.substring(0, 2) +
-                "amv-" + amv.substring(0, 2) +
-                "maf-" + maf.substring(0, 2) +
-                "mif-" + mif.substring(0, 2) +
-                "mm-" + mm.substring(0, 2);
+            name = "";
+            if (amu != "")
+                name += "amu-" + amu.substring(0, 2);
+            if (amv != "")
+                name += "amv-" + amv.substring(0, 2);
+            if (maf != "")
+                name += "maf-" + maf.substring(0, 2);
+            if (mif != "")
+                name += "mif-" + mif.substring(0, 2);
+            if (mm != "")
+                name += "mm-" + mm.substring(0, 2);
+            if (compare != "")
+                name += "cmp-" + compare;
         }
 
         if (resourceManager.get(name) !== undefined && resourceManager.get(name) !== null) {
@@ -478,7 +553,7 @@ const GPUVisibility = Object.freeze({
             return sampler;
         }
 
-        const sampler = new DogSampler(name, config);
+        const sampler = new DogSampler(name, descriptor);
         sampler.addReference();
 
         resourceManager.add(name, sampler);
@@ -489,7 +564,7 @@ const GPUVisibility = Object.freeze({
     /**
      * Creates a new static mesh from an OBJ file. The MTL file must be in the same directory.
      * @param {string} fileName The path to the OBJ file.
-     * @returns {Promise<DogStaticMesh>} The static mesh if the creation and stores in the resource manager is ok, null otherwise.
+     * @returns {DogStaticMesh} The static mesh if the creation and stores in the resource manager is ok, null otherwise.
      */
     async function createMeshByObjFile(fileName) {
         let text = await readFileAsText(fileName);
@@ -563,7 +638,7 @@ const GPUVisibility = Object.freeze({
                     },
                     {
                         binding: 2,
-                        resource: sampler.getGPUSampler()
+                        resource: sampler.getWebGPUSampler()
                     }
                 ]
             };
@@ -598,11 +673,11 @@ const GPUVisibility = Object.freeze({
                     },
                     {
                         binding: 1,
-                        resource: texture.getGPUTextureView()
+                        resource: texture.getWebGPUTextureView()
                     },
                     {
                         binding: 2,
-                        resource: sampler.getGPUSampler()
+                        resource: sampler.getWebGPUSampler()
                     }
                 ]
             };
@@ -642,8 +717,14 @@ const GPUVisibility = Object.freeze({
                 vertices.push(obj.geometries[i].data.normal[j]);
                 vertices.push(obj.geometries[i].data.normal[j + 1]);
                 vertices.push(obj.geometries[i].data.normal[j + 2]);
-                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
-                vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+
+                if (obj.geometries[i].data.texcoord !== undefined && obj.geometries[i].data.texcoord != null) {
+                    vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+                    vertices.push(obj.geometries[i].data.texcoord[iTex++]);
+                } else {
+                    vertices.push(0.0);
+                    vertices.push(0.0);
+                }
             }
 
             let mesh = new DogMesh(obj.geometries[i].object, false, false);
@@ -665,9 +746,176 @@ const GPUVisibility = Object.freeze({
         return staticMesh;
     }
 
+    /**
+     * Create a shader module from the provided shader source code.
+     * @param {string} shaderSource Source of vextex and fragment shaders in WGSL.
+     * @returns {GPUShaderModule} Shader module created from the provided source code.
+     */
+    function createShaderModule(name, shaderSource) {
+        const shaderModule = pGraphics.device.createShaderModule({
+            label: name,
+            code: shaderSource
+        });
+
+        return shaderModule;
+    }
+
+    /**
+     * Create a vertex buffer layout based on the provided vertex layout definition.
+     * @param {GPUVertexBufferLayout} vertexLayout Layout definition for the vertex buffer, 
+     * where each key is an attribute name and value is an object with a 'size' property indicating 
+     * the number of components (e.g., { position: { size: 3 }, color: { size: 4 } }).
+     * @returns {GPUVertexBufferLayout} Vertex buffer layout compatible with WebGPU pipeline creation.
+     */
+    function createVertexBufferLayout(vertexLayout) {
+        var attributes = [];
+        var offset = 0;
+        var location = 0;
+        var stride = 0;
+
+        for (const [key, value] of Object.entries(vertexLayout)) {
+            //console.log(`${key}: ${value}`);
+            attributes.push({
+                format: "float32x" + value,
+                offset: offset,
+                shaderLocation: location
+            });
+
+            location++;
+            offset += value * 4; // offset in bytes (value * 4 bytes per float)
+            stride += value;
+        }
+
+        const vertexBufferLayout = {
+            arrayStride: stride * 4, // stride * 4 bytes per float
+            attributes: attributes,
+        };
+
+        return vertexBufferLayout;
+    }
+
+    /**
+     * Create a pipeline layout based on the provided bind group layouts.
+     * @param {string} name Name of the pipeline layout.
+     * @param {GPUBindGroupLayout[]} bindGroupLayouts Array of bind group layouts to be used in the pipeline layout.
+     * @returns {GPUPipelineLayout} Pipeline layout created based on the bind group layouts.
+     */
+    function createPipelineLayout(name, bindGroupLayouts) {
+        var layout = "auto";
+
+        if (bindGroupLayouts != null && bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto') {
+            layout = pGraphics.device.createPipelineLayout({
+                label: name + " Pipeline Layout",
+                bindGroupLayouts: bindGroupLayouts
+            });
+        }
+
+        return layout;
+    }
+
+    /**
+     * Get all min and max vector in the boundings belong to the meshes.
+     * @param {DogStaticMesh[]} meshList Array of meshes.
+     * @returns {Array of Vector3} Array of vectors.
+     */
+    function getAllMinAndMaxVectorInMeshes(meshList) {
+        let vectors = [];
+
+        for (var i = 0; i < meshList.length; i++) {
+            const mesh = meshList[i];
+            for (var j = 0; j < mesh.getNumMeshes(); j++) {
+                let bounding = mesh.getMesh(j).getBoundingVolume();
+
+                vectors.push(bounding.getVectorMin());
+                vectors.push(bounding.getVectorMax());
+            }
+        }
+
+        return vectors;
+    }
+
+    /****
+     TODO Check this
+
+     import { mat4, vec3 } from 'gl-matrix';
+    */
+    /**
+     * Calcula dinámicamente la matriz de vista y la matriz ortogonal para la luz.
+     * @param {vec3} lightPos - Posición de la luz en el mundo.
+     * @param {vec3} lightTarget - Punto al que mira la luz.
+     * @param {Array} sceneBounds - Lista de puntos mínimos y máximos de los objetos en el mundo.
+     */
+    function calculateDynamicLightMatrices(lightPos, lightTarget, sceneBounds, padding) {
+        // 1. Calcular el vector UP dinámico para evitar singularidades
+        let lightDir = glMatrix.vec3.create();
+        glMatrix.vec3.sub(lightDir, lightTarget, lightPos);
+        glMatrix.vec3.normalize(lightDir, lightDir);
+
+        let lightUp = glMatrix.vec3.fromValues(0, 1, 0);
+        // Si la luz apunta casi verticalmente hacia abajo o arriba, cambiamos el UP al eje Z
+        if (Math.abs(lightDir[0]) < 0.001 && Math.abs(lightDir[2]) < 0.001) {
+            lightUp = glMatrix.vec3.fromValues(0, 0, -1);
+        }
+
+        // 2. Construir la Matriz de Vista de la Luz
+        let lightViewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightUp);
+        //glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightDir);
+        //glMatrix.mat4.invert(lightViewMatrix, lightViewMatrix);
+
+        // 3. Encontrar los límites en el espacio de la luz
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+
+        // Transformamos las esquinas de los objetos al espacio de la luz
+        for (const worldPoint of sceneBounds) {
+            let lightSpacePoint = glMatrix.vec3.create();
+            glMatrix.vec3.transformMat4(lightSpacePoint, worldPoint, lightViewMatrix);
+
+            // Actualizamos los extremos de nuestra caja ortogonal
+            if (lightSpacePoint[0] < minX) minX = lightSpacePoint[0];
+            if (lightSpacePoint[0] > maxX) maxX = lightSpacePoint[0];
+
+            if (lightSpacePoint[1] < minY) minY = lightSpacePoint[1];
+            if (lightSpacePoint[1] > maxY) maxY = lightSpacePoint[1];
+
+            if (lightSpacePoint[2] < minZ) minZ = lightSpacePoint[2];
+            if (lightSpacePoint[2] > maxZ) maxZ = lightSpacePoint[2];
+        }
+
+        // 4. Añadir un pequeño margen de seguridad (Padding)
+        // Esto evita que las sombras se corten abruptamente en los bordes debido al sesgo numérico
+        //const padding = 400.0;
+        let left = minX - padding;
+        let right = maxX + padding;
+        let bottom = minY - padding;
+        let top = maxY + padding;
+
+        // WebGPU requiere Z entre 0 y 1. 
+        // En el espacio de la luz de glMatrix, mirar "hacia adelante" entra en el eje Z negativo.
+        // Por lo tanto, el objeto más cercano a la luz tendrá el valor Z más alto (menos negativo),
+        // y el más lejano tendrá el valor Z más bajo (más negativo).
+        let near = -maxZ - padding;
+        let far = -minZ + padding;
+
+        // Forzar un near mínimo para evitar errores si la luz está encima de un objeto
+        if (near < 0.1) near = 0.1;
+
+        // 5. Construir la Matriz Ortogonal para WebGPU (Zero-to-One)
+        let lightProjectionMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.orthoZO(lightProjectionMatrix, left, right, bottom, top, near, far);
+
+        return {
+            viewMatrix: lightViewMatrix,
+            projectionMatrix: lightProjectionMatrix
+        };
+    }
+
     return {
         initWebGPU: initWebGPU,
         createBindGroupLayouts: createBindGroupLayouts,
+        parseBindGroupLayouts: parseBindGroupLayouts,
         createBindGroup: createBindGroup,
         createDogBuffer: createDogBuffer,
         readTextFromFile: readTextFromFile,
@@ -675,9 +923,15 @@ const GPUVisibility = Object.freeze({
         readFileAsText: readFileAsText,
         createDogTextureFromImage: createDogTextureFromImage,
         createDummyTexture: createDummyTexture,
+        createDogTexture: createDogTexture,
         createDogSampler: createDogSampler,
         createDefaultMaterial: createDefaultMaterial,
-        createMeshByObjFile: createMeshByObjFile
+        createMeshByObjFile: createMeshByObjFile,
+        createShaderModule: createShaderModule,
+        createVertexBufferLayout: createVertexBufferLayout,
+        createPipelineLayout: createPipelineLayout,
+        getAllMinAndMaxVectorInMeshes: getAllMinAndMaxVectorInMeshes,
+        calculateDynamicLightMatrices: calculateDynamicLightMatrices
     }
 
 })

@@ -22,27 +22,27 @@ class DogTexture extends DogResource {
     }
 
     /**
-     * Sets the GPU texture.
+     * Sets the WebGPU texture.
      * @param {GPUTexture} texture The GPU texture to set.
      */
-    setGPUTexture(texture) {
+    setWebGPUTexture(texture) {
         this.texture = texture;
         this.textureView = texture.createView();
     }
 
     /**
-     * Gets the GPU texture.
+     * Gets the WebGPU texture.
      * @returns {GPUTexture} The GPU texture.
      */
-    getGPUTexture() {
+    getWebGPUTexture() {
         return this.texture;
     }
 
     /**
-     * Gets the GPU texture view.
+     * Gets the WebGPU texture view.
      * @returns {GPUTextureView} The GPU texture view.
      */
-    getGPUTextureView() {
+    getWebGPUTextureView() {
         return this.textureView;
     }
 

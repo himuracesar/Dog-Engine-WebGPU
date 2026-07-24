@@ -56,5 +56,5 @@ VertexOutput {
 
 @fragment
 fn fragmentMain(@location(1) normal: vec3f, @location(2) texCoord: vec2f) -> @location(0) vec4f {
-    return textureSample(texture, samp, texCoord) * material.diffuseColor;
+    return textureSample(texture, samp, texCoord) + material.diffuseColor;
 }

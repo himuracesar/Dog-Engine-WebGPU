@@ -95,4 +95,13 @@ class DogStaticMesh {
     getNumMeshes() {
         return this.meshes.length;
     }
+
+    /**
+     * Get a mesh from the static mesh.
+     * @param {int} index The index of the mesh.
+     * @returns {DogMesh} The mesh.
+     */
+    getMesh(index) {
+        return this.meshes[index];
+    }
 }
