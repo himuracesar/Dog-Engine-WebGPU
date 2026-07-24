@@ -280,6 +280,7 @@
         let grid
         let cornellBox;
         let cube;
+        let cylinder;
 
         let directionalLight;
 
@@ -315,15 +316,28 @@
 
             cornellBox = shape.createCornellBox(descriptor);
 
+            descriptor = {};
+            descriptor.slices = 10;
+            descriptor.stacks = 10;
+            descriptor.bottomRadio = 70.0;
+            descriptor.topRadio = 70.0;
+            descriptor.height = 400.0;
+            descriptor.boundingVolumeType = BoundingVolumeType.Box;
+
+            cylinder = shape.createCylinder(descriptor);
+
             dragon = await webGPUengine.createMeshByObjFile("/resources/models/dragon_standford.obj");
-            dragon.getTransform().translateAbsolute(0.0, 260.0, 0.0);
+            dragon.getTransform().translateAbsolute(70.0, 260.0, -80.0);
             dragon.getTransform().scaleAbsolute(250.0, 250.0, 250.0);
             dragon.getTransform().rotateAbsolute(0.0, 90.0, 0.0);
 
-            cube.getTransform().translateAbsolute(0.0, 100.0, 0.0);
+            cube.getTransform().translateAbsolute(70.0, 100.0, -80.0);
+
+            cylinder.getTransform().translateAbsolute(-110.0, 200.0, 120.0);
 
             meshesInShadow.push(cube);
             meshesInShadow.push(cornellBox);
+            meshesInShadow.push(cylinder);
         }
 
         /**
@@ -374,6 +388,7 @@
             resourceManager.add("m_yellow", material);
 
             cube.setMaterial(0, material.getId());
+            cylinder.setMaterial(0, material.getId());
 
             dummyTexture = webGPUengine.createDummyTexture();
             const sampler = webGPUengine.createDogSampler("", { magFilter: "linear", minFilter: "linear" });
@@ -718,6 +733,7 @@
             cornellBox.update(dt);
 
             cube.update(dt);
+            cylinder.update(dt);
 
             grid.update(dt);
 
@@ -740,6 +756,7 @@
                 shadowPass.setBindGroup(0, shadows.bgShadowMap);
 
                 cube.render(shadowPass);
+                cylinder.render(shadowPass);
                 dragon.render(shadowPass);
 
                 shadowPass.end();
@@ -764,6 +781,7 @@
                 dragon.render(renderPass);
                 cornellBox.render(renderPass);
                 cube.render(renderPass);
+                cylinder.render(renderPass);
 
                 screenShadowMap.render(renderPass);
 
