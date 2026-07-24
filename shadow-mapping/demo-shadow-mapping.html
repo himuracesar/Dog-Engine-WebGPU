@@ -204,6 +204,7 @@
         // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
         setInterval(() => {
             panePerformance.refresh();
+            paneLights.refresh();
         }, 100);
 
         window.addEventListener(EVT_INIT, (e) => {
@@ -538,11 +539,21 @@
             if (shadowState === undefined || shadowState == null)
                 return;
 
-            if (directionalLight !== undefined && directionalLight != null)
-                directionalLight.setPosition([shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z, 1.0]);
-
             shadows.lightPosition = [shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z];
             shadows.lightLookAt = [shadowState.lightLookAt.x, shadowState.lightLookAt.y, shadowState.lightLookAt.z];
+
+            if (directionalLight !== undefined && directionalLight != null) {
+                directionalLight.setPosition([shadowState.lightPosition.x, shadowState.lightPosition.y, shadowState.lightPosition.z, 1.0]);
+
+                let dirLight = glMatrix.vec3.create();
+                glMatrix.vec3.subtract(dirLight, shadows.lightLookAt, shadows.lightPosition);
+                glMatrix.vec3.normalize(dirLight, dirLight);
+
+                directionalLight.setDirection([dirLight[0], dirLight[1], dirLight[2], 0.0]);
+                directionalLightState.direction.x = dirLight[0];
+                directionalLightState.direction.y = dirLight[1];
+                directionalLightState.direction.z = dirLight[2];
+            }
 
             let sceneBounds = webGPUengine.getAllMinAndMaxVectorInMeshes(meshesInShadow);
 
