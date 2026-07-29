@@ -132,7 +132,7 @@ fn GetSpecularBlinnLighting(light: vec3<f32>, normal: vec3<f32>, viewDirection: 
 }
 
 /**
- * Gets the diffuse lighting for a given light, material, and normal.
+ * Gets the diffuse lighting with Lambert's technique for a given light, material, and normal.
  * 
  * @param light The direction of the light.
  * @param normal The normal of the surface.
@@ -149,15 +149,61 @@ fn GetDiffuseLighting(light: vec3<f32>, normal: vec3<f32>, color: vec4<f32>, dif
 }
 
 /**
+ * Computes the specular lighting with Cook-Torrance technique.
+ * The outcome of the fresnel with this implementation is better than PBR.
+ * Formulas taked from the book ShaderX2 Introductions & tutorials with DirectX 9.
+ *
+ * @param light Light vector
+ * @param normal normal vector of the mesh
+ * @param viewDirection Direction vector of the camera. From camera position to pixel.
+ * @param lightColor Color light
+ * @param material material
+ */
+fn DoCookTorrance(light: vec3<f32>, normal: vec3<f32>, viewDirection: vec3<f32>, lightColor: vec4<f32>, material: Material) -> vec4<f32>
+{
+    var vHalf = normalize(light + normalize(viewDirection));
+    var vNormal = normalize(normal);
+    //var vNormal = normal;
+
+    //---------- Beckman's distrubution function ---------
+    var normalDotHalf = dot(vNormal, vHalf);
+    var normalDotHalf2 = normalDotHalf * normalDotHalf;
+    var roughness2 = material.roughness * material.roughness;
+    var exponent = -(1.0f - normalDotHalf2) / (normalDotHalf2 * roughness2);
+    var e = 2.71828182845904523536028747135f;
+    var D = pow(e, exponent) / (roughness2 * normalDotHalf2 * normalDotHalf2);
+
+    //---------- Compute Fresnel term F ---------
+    var normalDotCamera = dot(vNormal, viewDirection);
+    var F = mix(pow(1.0f - normalDotCamera, 2.0f), 1.0f, material.fresnel);
+
+    //---------- Compute self shadowing term G ---------
+    var normalDotLight = dot(vNormal, light);
+    var X = 2.0f * normalDotHalf / dot(viewDirection, vHalf);
+    var G = min(1.0f, min(X * normalDotLight, X * normalDotCamera));
+
+    //---------- Compute final Cook-Torrance specular term ---------
+    var pi = 3.1415926535897932384626433832f;
+    var cookTorrance = (D * F * G) / (normalDotCamera * pi);
+
+    return lightColor * max(0.0f, cookTorrance) * lightColor.a * material.specularColor;
+    //return vec4<f32>(vNormal, 1.0f);
+}
+
+/**
  * Computes the lighting for a given directional light.
  * 
  * @param dl The directional light.
  * @param material The material.
  * @param normal The normal of the surface.
  * @param viewDirection The direction of the view.
+ * @param specularTech The specular technique to use.
+ *        0 = Phong
+ *        1 = Blinn-Phong
+ *        2 = Cook-Torrance
  * @returns The lighting that is the sum of diffuse, specular and ambient lighting.
  */
-fn ComputeDirectionalLight(dl: DirectionalLight, material: Material, normal: vec3<f32>, viewDirection: vec3<f32>, blinnSpecular: bool) -> Lighting
+fn ComputeDirectionalLight(dl: DirectionalLight, material: Material, normal: vec3<f32>, viewDirection: vec3<f32>, specularTech: i32) -> Lighting
 {
     var lighting = Lighting(
         vec4<f32>(0.0, 0.0, 0.0, 1.0),
@@ -165,17 +211,19 @@ fn ComputeDirectionalLight(dl: DirectionalLight, material: Material, normal: vec
         vec4<f32>(0.0, 0.0, 0.0, 1.0)
     );
     
-    var mWorldView = camera.viewMatrix;// * model.modelMatrix;
+    //var mWorldView = camera.viewMatrix;// * model.modelMatrix;
 
-    var light = mWorldView * -dl.direction;
+    var light = camera.viewMatrix * -dl.direction;
     light = normalize(light);
     
     lighting.diffuse = dl.intensity * GetDiffuseLighting(light.xyz, normal, dl.color, material.diffuseColor);
     
-    if(!blinnSpecular){
+    if(specularTech == 0){
         lighting.specular = dl.intensity * GetSpecularLighting(light.xyz, normalize(normal), viewDirection, dl.color, material.specularColor, material.specularPower);
-    }else{
+    } else if(specularTech == 1){
         lighting.specular = dl.intensity * GetSpecularBlinnLighting(light.xyz, normalize(normal), viewDirection, dl.color, material.specularColor, material.specularPower);
+    } else if(specularTech == 2){
+        lighting.specular = dl.intensity * DoCookTorrance(light.xyz, normalize(normal), viewDirection, dl.color, material);
     }
     
     lighting.ambient = GetAmbientLighting(dl.color, material.ambientColor);
@@ -191,9 +239,13 @@ fn ComputeDirectionalLight(dl: DirectionalLight, material: Material, normal: vec
  * @param position The position of the surface.
  * @param normal The normal of the surface.
  * @param viewDirection The direction of the view.
+ * @param specularTech The specular technique to use.
+ *        0 = Phong
+ *        1 = Blinn-Phong
+ *        2 = Cook-Torrance
  * @returns The lighting that is the sum of diffuse, specular and ambient lighting.
  */
-fn ComputePointLight(pl: PointLight, material: Material, position: vec3<f32>, normal: vec3<f32>, viewDirection: vec3<f32>, blinnSpecular: bool) -> Lighting
+fn ComputePointLight(pl: PointLight, material: Material, position: vec3<f32>, normal: vec3<f32>, viewDirection: vec3<f32>, specularTech: i32) -> Lighting
 {
     var lighting = Lighting(
         vec4<f32>(0.0, 0.0, 0.0, 1.0),
@@ -220,10 +272,12 @@ fn ComputePointLight(pl: PointLight, material: Material, position: vec3<f32>, no
     var normaln = normalize(normal);
     lighting.diffuse = pl.intensity * GetDiffuseLighting(lightDirectionWV, normaln, pl.color, material.diffuseColor);
 
-    if(!blinnSpecular){
+    if(specularTech == 0){
         lighting.specular = pl.intensity * GetSpecularLighting(lightDirectionWV, normaln, normalize(viewDirection), pl.color, material.specularColor, material.specularPower);
-    } else {
+    } else if(specularTech == 1){
         lighting.specular = pl.intensity * GetSpecularBlinnLighting(lightDirectionWV, normaln, normalize(viewDirection), pl.color, material.specularColor, material.specularPower);
+    } else if(specularTech == 2){
+        lighting.specular = pl.intensity * DoCookTorrance(lightDirectionWV, normaln, viewDirection, pl.color, material);
     }
 
     var attenuation = GetAttenuation(pl.kc, pl.kl, pl.kq, d);
@@ -242,9 +296,13 @@ fn ComputePointLight(pl: PointLight, material: Material, position: vec3<f32>, no
  * @param position The position of the surface.
  * @param normal The normal of the surface.
  * @param viewDirection The direction of the view.
+ * @param specularTech The specular technique to use.
+ *        0 = Phong
+ *        1 = Blinn-Phong
+ *        2 = Cook-Torrance
  * @returns The lighting that is the sum of diffuse, specular and ambient lighting.
  */
-fn ComputeSpotLight(sl: SpotLight, material: Material, position: vec3<f32>, normal: vec3<f32>, viewDirection: vec3<f32>, blinnSpecular: bool) -> Lighting
+fn ComputeSpotLight(sl: SpotLight, material: Material, position: vec3<f32>, normal: vec3<f32>, viewDirection: vec3<f32>, specularTech: i32) -> Lighting
 {
     var lighting = Lighting(
         vec4<f32>(0.0, 0.0, 0.0, 1.0),
@@ -271,10 +329,12 @@ fn ComputeSpotLight(sl: SpotLight, material: Material, position: vec3<f32>, norm
     var normaln = normal; //normalize(normal);
     lighting.diffuse = sl.intensity * GetDiffuseLighting(lightDirectionWV, normaln, sl.color, material.diffuseColor);
 
-    if(!blinnSpecular){
+    if(specularTech == 0){
         lighting.specular = sl.intensity * GetSpecularLighting(lightDirectionWV, normaln, normalize(viewDirection), sl.color, material.specularColor, material.specularPower);
-    } else {
+    }else if(specularTech == 1){
         lighting.specular = sl.intensity * GetSpecularBlinnLighting(lightDirectionWV, normaln, normalize(viewDirection), sl.color, material.specularColor, material.specularPower);
+    }else if(specularTech == 2){
+        lighting.specular = sl.intensity * DoCookTorrance(lightDirectionWV, normaln, viewDirection, sl.color, material);
     }
 
     //float spot = pow(max(dot(-light, normalize(sl.  )), 0.0f), sl.spotAngle);

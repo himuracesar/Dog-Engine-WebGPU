@@ -144,7 +144,7 @@ fn fragmentMain(
     let shadow = ShadowCalculation(posShadow, positionW, normalW);
 
     if(directionalLight.enabled > 0){
-        var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz), false);
+        var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz), 0);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
