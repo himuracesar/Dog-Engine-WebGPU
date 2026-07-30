@@ -43,11 +43,45 @@
             /* Force GPU Layer */
         }
 
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewport-container canvas {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading-overlay {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #11111100;
+            /* opcional, para tapar el canvas mientras carga */
+            z-index: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         /* Containers for the Widgets */
         .widget-pane {
             /*position: fixed;*/
             position: absolute;
-            z-index: 10;
+            z-index: 100;
             width: 260px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
             /* Avoid that events affect the canvas if not necessary */
@@ -246,6 +280,7 @@
     <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
 
     <script type="text/javascript" src="/pipeline/BlinnPhongShadingPipeline.js"></script>
+    <script type="text/javascript" src="pipeline/GeneralPipeline.js"></script>
 </head>
 
 <body onload="init();">
@@ -254,6 +289,13 @@
     <!-- Containers for Tweakpane -->
     <div id="ui-performance" class="widget-pane"></div>
     <div id="ui-config" class="widget-pane"></div>
+
+    <!-- Loading -->
+    <div class="viewport-container">
+        <div id="loading-overlay">
+            <img src="/images/Pacman-loading.gif" alt="Loading...">
+        </div>
+    </div>
 
     <script type="text/javascript">
         let canvas;
@@ -270,6 +312,7 @@
         let phongShadingPipeline;
         let gouradShadingPipeline;
         let blinnPhongShadingPipeline;
+        let cookTorranceShadingPipeline;
         let wireframePipeline;
 
         let camera;
@@ -277,6 +320,7 @@
         let spherePhong;
         let sphereGourad;
         let sphereBlinnPhong;
+        let sphereCookTorrance;
 
         let material = null;
         let directionalLight = null;
@@ -305,6 +349,7 @@
             spherePhong = shape.createSphere(descriptor);
             sphereGourad = shape.createSphere(descriptor);
             sphereBlinnPhong = shape.createSphere(descriptor);
+            sphereCookTorrance = shape.createSphere(descriptor);
 
             descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
@@ -318,6 +363,7 @@
             spherePhong.getTransform().translateAbsolute(0.0, 30.0, 0.0);
             sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
             sphereBlinnPhong.getTransform().translateAbsolute(-140.0, 30, 0.0);
+            sphereCookTorrance.getTransform().translateAbsolute(0.0, 30.0, -140);
         }
 
         async function createPipeline() {
@@ -349,10 +395,18 @@
             let blinnPhongShaders = [
                 await webGPUengine.readFileAsText("/shaders/Common.wgsl"),
                 await webGPUengine.readFileAsText("/shaders/LightsAndMaterial.wgsl"),
-                await webGPUengine.readFileAsText("/shaders/BlinnPhongShader.wgsl")
+                await webGPUengine.readFileAsText("/lights-materials/shaders/BlinnPhongShader.wgsl")
             ];
 
             blinnPhongShadingPipeline = new BlinnPhongShadingPipeline(bglPhong, blinnPhongShaders);
+
+            let cookTorranceShaders = [
+                await webGPUengine.readFileAsText("/shaders/Common.wgsl"),
+                await webGPUengine.readFileAsText("/shaders/LightsAndMaterial.wgsl"),
+                await webGPUengine.readFileAsText("/lights-materials/shaders/CookTorranceShader.wgsl")
+            ];
+
+            cookTorranceShadingPipeline = new GeneralPipeline("cook-torrance", bglPhong, cookTorranceShaders);
         }
 
         function createProps() {
@@ -392,7 +446,7 @@
 
             pointLight = new DogPointLight(true, false);
             pointLight.setColor([1.0, 1.0, 1.0, 1.0]);
-            pointLight.setPosition([0.0, 100.0, 0.0]);
+            pointLight.setPosition([0.0, 100.0, -50.0]);
             pointLight.setRange(80);
             pointLight.setColor([0.99, 0.99, 0.99, 1.0]);
             pointLight.setLinealAttenuation(0.125);
@@ -419,10 +473,13 @@
             spotLight.setAngleZ(glMatrix.glMatrix.toRadian(0.0));
             spotLight.setDirection([0.0, -1.0, 0.0]);
 
-            material = new DogMaterial();
+            material = new DogMaterial("m_red");
             material.setDiffuseColor([1.0, 0.0, 0.0, 1.0]);
             material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
-            material.setAmbientColor([0.1, 0.1, 0.1, 1.0]);
+            material.setAmbientColor([0.1, 0.0, 0.0, 1.0]);
+            //material.setMetallness(1.0);
+            material.setRoughness(0.05);
+            material.setFresnel(0.0);
 
             directionalLightState.color.r = directionalLight.getColor()[0];
             directionalLightState.color.g = directionalLight.getColor()[1];
@@ -491,7 +548,7 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.readFileAsJson("/DogEngine/config/configScene.json");
+            let configScene = await webGPUengine.readFileAsJson("/lights-materials/config/configScene.json");
 
             webGPUengine.createBindGroupLayouts(configScene);
 
@@ -529,6 +586,9 @@
             directionalLight.setIdBindGroup(idBindGroupLighting);
             pointLight.setIdBindGroup(idBindGroupLighting);
             spotLight.setIdBindGroup(idBindGroupLighting);
+
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.add('hidden');
 
             requestAnimationFrame(updateAndRender);
         }
@@ -655,6 +715,7 @@
             spherePhong.update(dt);
             sphereGourad.update(dt);
             sphereBlinnPhong.update(dt);
+            sphereCookTorrance.update(dt);
             grid.update(dt);
         }
 
@@ -702,6 +763,9 @@
 
             pass.setPipeline(blinnPhongShadingPipeline.getWebGPUPipeline());
             sphereBlinnPhong.render(pass);
+
+            pass.setPipeline(cookTorranceShadingPipeline.getWebGPUPipeline());
+            sphereCookTorrance.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props

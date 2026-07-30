@@ -1,6 +1,6 @@
 struct VertexOutput {
     @builtin(position) Position : vec4<f32>,
-    @location(1) normal : vec3<f32>,
+    @location(1) normalWV : vec3<f32>,
     @location(2) texCoord : vec2<f32>,
     @location(3) positionWV : vec3<f32>
 };
@@ -34,9 +34,8 @@ VertexOutput {
 
     output.Position = camera.projectionMatrix * camera.viewMatrix * model.modelMatrix * vec4f(position, 1.0);
 
-    var normalWorld = model.modelMatrix * vec4f(normal, 0.0);
-    //output.Normal = normal; //normalWorld.xyz;
-    output.normal = (camera.viewMatrix * normalWorld).xyz; //transform the normal to view space
+    output.normalWV = (camera.viewMatrix * model.modelMatrix * vec4f(normal, 0.0f)).xyz;
+    //output.normalWV = (transpose(inverseMat4x4(camera.viewMatrix * model.modelMatrix)) * vec4<f32>(normal, 0.0f)).xyz;
     output.positionWV = (camera.viewMatrix * model.modelMatrix * vec4f(position, 1.0)).xyz;
 
     output.texCoord = texCoord;
@@ -45,8 +44,8 @@ VertexOutput {
 }
 
 @fragment
-fn fragmentMain(@location(1) normal: vec3f, @location(2) texCoord: vec2f, @location(3) positionWV: vec3f) -> @location(0) vec4f {
-    var normalWV = normalize((camera.viewMatrix * vec4<f32>(normalize(normal), 0.0f)).xyz);
+fn fragmentMain(@location(1) normalWV: vec3f, @location(2) texCoord: vec2f, @location(3) positionWV: vec3f) -> @location(0) vec4f {
+    //var normalWV = normalize((camera.viewMatrix * vec4<f32>(normalize(normal), 0.0f)).xyz);
 
     // Camera's position in view space is always at the origin (0, 0, 0) because the view matrix transforms world space to view space.
     var cameraPosWV = vec4<f32>(0.0, 0.0, 0.0, 1.0);
@@ -59,21 +58,21 @@ fn fragmentMain(@location(1) normal: vec3f, @location(2) texCoord: vec2f, @locat
     );
 
     if(directionalLight.enabled > 0){
-        var l = ComputeDirectionalLight(directionalLight, material, normalize(normal), normalize(viewDirection.xyz), true);
+        var l = ComputeDirectionalLight(directionalLight, material, normalWV, viewDirection.xyz, 2);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
     }
 
     if(pointLight.enabled > 0){
-        var l = ComputePointLight(pointLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz), true);
+        var l = ComputePointLight(pointLight, material, positionWV, normalWV, viewDirection.xyz, 2);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
     }
 
     if(spotLight.enabled > 0){
-        var l = ComputeSpotLight(spotLight, material, positionWV, normalize(normal), normalize(viewDirection.xyz), true);
+        var l = ComputeSpotLight(spotLight, material, positionWV, normalWV, viewDirection.xyz, 2);
         lighting.diffuse += l.diffuse;
         lighting.specular += l.specular;
         lighting.ambient += l.ambient;
