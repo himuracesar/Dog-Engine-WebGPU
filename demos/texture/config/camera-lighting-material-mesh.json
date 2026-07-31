@@ -1,0 +1,89 @@
+[
+    {
+        "label": "Camera",
+        "group": 0,
+        "entries": [
+            {
+                "name": "DogCamera",
+                "binding": 0,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            }
+        ]
+    },
+    {
+        "label": "Lighting",
+        "group": 1,
+        "entries": [
+            {
+                "name": "DogDirectionalLight",
+                "binding": 0,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            },
+            {
+                "name": "DogPointLight",
+                "binding": 1,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            },
+            {
+                "name": "DogSpotLight",
+                "binding": 2,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            }
+        ]
+    },
+    {
+        "label": "Material",
+        "group": 2,
+        "entries": [
+            {
+                "name": "DogMaterial",
+                "binding": 0,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            },
+            {
+                "binding": 1,
+                "visibility": "Fragment",
+                "texture": {
+                    "sampleType": "float",
+                    "viewDimension": "2d"
+                }
+            },
+            {
+                "binding": 2,
+                "visibility": "Fragment",
+                "sampler": {
+                    "type": "filtering"
+                }
+            }
+        ]
+    },
+    {
+        "label": "Transform Mesh",
+        "group": 3,
+        "entries": [
+            {
+                "name": "DogTransform",
+                "binding": 0,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            }
+        ]
+    }
+]
