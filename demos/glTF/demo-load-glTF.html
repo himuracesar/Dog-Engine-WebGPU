@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">|
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog Engine WebGPU - Demo Load glTF Models</title>
+
+    <style>
+        :root {
+            --tp-base-background-color: hsla(0, 0%, 10%, 0.8);
+            --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+            --tp-button-background-color: hsla(0, 0%, 80%, 1);
+            --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+            --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+            --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+            --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+            --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+            --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+            --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+            --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+            --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+            --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+            --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.3);
+        }
+
+        /*body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }*/
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            transform: translateZ(0);
+            /* Force GPU Layer */
+        }
+
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewport-container canvas {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading-overlay {
+            position: relative;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #11111100;
+            /* opcional, para tapar el canvas mientras carga */
+            z-index: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Containers for the Widgets */
+        .widget-pane {
+            /*position: fixed;*/
+            position: absolute;
+            z-index: 100;
+            width: 260px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            /* Avoid that events affect the canvas if not necessary */
+            pointer-events: auto;
+
+            transform: translateZ(0);
+            /* Crea un nuevo stacking context en GPU */
+            backface-visibility: hidden;
+            perspective: 1000;
+            will-change: transform, opacity;
+        }
+
+        #ui-camera {
+            top: 10px;
+            right: 300px;
+        }
+
+        #ui-geometry {
+            top: 10px;
+            right: 20px;
+        }
+
+        #ui-performance {
+            bottom: 20px;
+            left: 10px;
+            width: 200px;
+        }
+
+        #ui-config {
+            top: 10px;
+            left: 10px;
+        }
+
+        #ui-lights {
+            top: 10px;
+            right: 20px;
+        }
+
+        .label {
+            position: fixed;
+            bottom: 10px;
+            right: 20px;
+            color: #555;
+            font-size: 12px;
+        }
+    </style>
+
+    <!--link rel="icon" type="image/x-icon" href="/icon/Triangle_icon.png"-->
+    <link rel="icon" href="../../DogEngine/ico/Dog.png" type="image/png">
+
+    <script>
+        // Global state for the performance monitor
+        let performanceState = {
+            fps: 0.0
+        };
+        // Global state for the configuration parameters
+        let configState = {
+            background: { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+        };
+
+        let directionalLightState = {
+            color: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+            direction: { x: 1.0, y: -1.0, z: -1.0 },
+            enabled: true,
+            intensity: 1.0
+        };
+
+    </script>
+
+    <script type="module">
+        import { Pane } from '/DogEngine/lib/tweakpane-4.0.5.js';
+        //import { mat4 } from 'gl-matrix';
+
+        // --- Widget 1: Performance  ---
+        const panePerformance = new Pane({ container: document.getElementById('ui-performance'), title: '📊 Performance' });
+        panePerformance.addBinding(performanceState, 'fps', { label: 'FPS', readonly: true, view: 'number' }).on('change', emitUI);
+        panePerformance.addBinding(performanceState, 'fps', {
+            label: 'FPS Graph', readonly: true, view: 'graph',
+            interval: 100, bufferSize: 64, min: 10, max: 200
+        }).on('change', emitUI);
+
+        // --- Widget 2: Config  ---
+        const paneConfig = new Pane({ container: document.getElementById('ui-config'), title: '⚙️ Config' });
+        paneConfig.addBinding(configState, 'background', { color: { type: 'float' } }).on('change', emitUI);
+
+        // --- Widget 3: Lights  ---
+        const paneLights = new Pane({ container: document.getElementById('ui-lights'), title: '💡 Lights' });
+        const directionalLightFolder = paneLights.addFolder({
+            title: 'Directional Light',
+            expanded: false,   // optional
+        });
+
+        directionalLightFolder.addBinding(directionalLightState, 'color', { color: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'direction', { vector: { type: 'float' } }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'enabled', { label: 'Enabled' }).on('change', emitUI);
+        directionalLightFolder.addBinding(directionalLightState, 'intensity', { label: 'Intensity', min: 0, max: 100, step: 0.1 }).on('change', emitUI);
+
+        // Send data to the engine
+        function emitUI() {
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: performanceState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: configState }));
+            window.dispatchEvent(new CustomEvent(EVT_UI, { detail: directionalLightState }));
+        }
+
+        // Refresh UI at a lower rate (e.g., 10Hz or 15Hz is enough for the human eye)
+        setInterval(() => {
+            panePerformance.refresh();
+        }, 100);
+
+        window.addEventListener(EVT_INIT, (e) => {
+            paneLights.refresh();
+        });
+
+        // Emit initial state
+        emitUI();
+    </script>
+
+    <script type="module">
+        //import { WebIO } from '../../DogEngine/lib/gltf-transform/core/index.js';
+        //import { WebIO } from '.../../DogEngine/lib/gltf-transform-core.js';
+    </script>
+
+    <script type="text/javascript" src="/DogEngine/pipeline/structs/LightsAndMaterial.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/WebGPU-Engine.js"></script>
+    <script type="text/javascript" src="/DogEngine/lib/gl-matrix-min.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/lib/gltf-transform/core/index.js"></script>
+
+    <script type="text/javascript" src="/DogEngine/DogCamera.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogShape.js"></script>
+    <script type="text/javascript" src="/DogEngine/DogStaticMesh.js"></script>
+    <script type="text/javascript" src="/DogEngine/light/DogDirectionalLight.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/DogPipeline.js"></script>
+    <script type="text/javascript" src="/DogEngine/pipeline/WireframePipeline.js"></script>
+</head>
+
+<body onload="init();">
+    <canvas width="800" height="600" id="WebGPUcanvas"></canvas>
+
+    <!-- Containers for Tweakpane -->
+    <div id="ui-performance" class="widget-pane"></div>
+    <div id="ui-config" class="widget-pane"></div>
+
+    <!-- Loading -->
+    <div class="viewport-container">
+        <div id="loading-overlay">
+            <img src="/images/Pacman-loading.gif" alt="Loading...">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        let canvas;
+        let pGraphics;
+
+        let lastTime = 0;
+
+        /******* Events' names for clean communication *******/
+        const EVT_DATA = 'engine-data-update';
+        const EVT_UI = 'ui-params-change';
+        const EVT_INIT = 'engine-init';
+        //***************************************************
+
+        let wireframePipeline;
+
+        let camera;
+
+        let directionalLight = null;
+
+        let bindGroupLayouts;
+
+        let depthTexture;
+
+        let propsBindGroup;
+        let propsBindGroupLayout;
+
+        //------------------- Demo's main functions -------------------
+        function createShapes() {
+            const shape = new DogShape();
+
+            let descriptor = {};
+            descriptor.delta = [100.0, 0.0, 100.0];
+            descriptor.numVertRows = 50;
+            descriptor.numVertCols = 50;
+            descriptor.position = [0.0, 0.0, 0.0];
+            descriptor.texScale = 1.0;
+
+            grid = shape.createGrid(descriptor);
+        }
+
+        async function createPipeline() {
+            const bglWireframe = [
+                resourceManager.getBindGroupLayout(0),
+                undefined,
+                propsBindGroupLayout,
+                resourceManager.getBindGroupLayout(3),
+            ];
+
+            wireframePipeline = new WireframePipeline(bglWireframe);
+        }
+
+        function createProps() {
+            propsBindGroupLayout = pGraphics.device.createBindGroupLayout({
+                entries: [{
+                    binding: 0,                           // Same index as in the bindGroup
+                    visibility: GPUShaderStage.FRAGMENT,    // In which stages is visible
+                    buffer: {
+                        type: "uniform"                     // uniform buffer (default)
+                    }
+                }]
+            });
+
+            let propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
+            let propsBuffer = pGraphics.device.createBuffer({
+                size: propsData.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+            pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
+
+            propsBindGroup = pGraphics.device.createBindGroup({
+                layout: propsBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: propsBuffer,
+                        },
+                    },
+                ],
+            });
+        }
+
+        function createLights() {
+            directionalLight = new DogDirectionalLight(true, false);
+            directionalLight.setEnabled(true);
+
+            directionalLightState.color.r = directionalLight.getColor()[0];
+            directionalLightState.color.g = directionalLight.getColor()[1];
+            directionalLightState.color.b = directionalLight.getColor()[2];
+            directionalLightState.color.a = directionalLight.getColor()[3];
+            directionalLightState.direction.x = directionalLight.getDirection()[0];
+            directionalLightState.direction.y = directionalLight.getDirection()[1];
+            directionalLightState.direction.z = directionalLight.getDirection()[2];
+            directionalLightState.enabled = directionalLight.isEnabled();
+            directionalLightState.intensity = directionalLight.getIntensity();
+
+            window.dispatchEvent(new CustomEvent(EVT_INIT, {}));
+        }
+
+        //------------------ End demo's main functons -----------------
+
+        /**
+         * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
+         */
+        async function init() {
+            canvas = document.getElementById("WebGPUcanvas");
+
+            pGraphics = await webGPUengine.initWebGPU(canvas);
+
+            window.onkeydown = event => this.onKeyDown(event);
+            window.onkeyup = event => this.onKeyUp(event);
+            canvas.onmouseup = event => this.onMouseUp(event);
+            canvas.onmousedown = event => this.onMouseDown(event);
+            canvas.onmousemove = event => this.onMouseMove(event);
+
+            depthTexture = pGraphics.device.createTexture({
+                size: [canvas.width, canvas.height],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+
+            let configScene = await webGPUengine.readFileAsJson("/demos/glTF/config/camera-light-material-mesh.json");
+
+            webGPUengine.createBindGroupLayouts(configScene);
+
+            camera = new DogCamera();
+            camera.setPosition([0.0, 0.0, 100.0]);
+            camera.setSpeed(5.0);
+            camera.setFarPlane(4000.0);
+
+            createShapes();
+            createLights();
+            createProps();
+            await createPipeline();
+
+            const io = new WebIO();
+
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.add('hidden');
+
+            requestAnimationFrame(updateAndRender);
+        }
+
+        //------------- Input -------------
+        /**
+         * Release click and stop dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseUp(event) {
+            this.dragging = false;
+            mouse.down = false;
+        }
+
+        /**
+         * Click and start dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseDown(event) {
+            this.dragging = true;
+            let x = event.clientX; // x coordinate of a mouse pointer
+            let y = event.clientY; // y coordinate of a mouse pointer
+            let rect = event.target.getBoundingClientRect();
+
+            //console.log("Mouse down at: " + x + ", " + y);
+            mouse.down = true;
+            mouse.x = x;
+            mouse.y = y;
+
+            //x = ((x - rect.left) - canvas.width / 2) / (canvas.width / 2);
+            //y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2);
+            console.log("Mouse down at: " + x + ", " + y);
+        }
+
+        /**
+         * If dragging, calculates the difference in mouse position and rotates the camera.
+         * @param {MouseEvent} event 
+         */
+        function onMouseMove(event) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+
+            this.x = event.clientX;
+            this.y = event.clientY;
+
+            mouse.x = this.x;
+            mouse.y = this.y;
+
+            if (!this.dragging)
+                return;
+
+            const dx = this.x - this.lastX;
+            const dy = this.y - this.lastY;
+
+            camera.yaw(dx * camera.getSpeedRotation());
+            camera.pitch(dy * camera.getSpeedRotation());
+        }
+
+        /**
+         * Handles input events.
+         */
+        function input() {
+            if (keypress[KeyCode.W])
+                camera.moveForward(1);
+            if (keypress[KeyCode.S])
+                camera.moveForward(-1);
+            if (keypress[KeyCode.A])
+                camera.strafe(-1);
+            if (keypress[KeyCode.D])
+                camera.strafe(1);
+            if (keypress[KeyCode.Left])
+                camera.yaw(0.01);
+            if (keypress[KeyCode.Right])
+                camera.yaw(-0.01);
+            if (keypress[KeyCode.Up])
+                camera.pitch(0.01);
+            if (keypress[KeyCode.Down])
+                camera.pitch(-0.01);
+        }
+
+        //------------- End Input -------------
+        /**
+         * Updates the performance state and handles input.
+         * @param {float} time - The current time in milliseconds.
+         */
+        function update(time) {
+            const dt = (time - lastTime);
+            lastTime = time;
+
+            performanceState.fps = 1000 / dt;
+
+            //--------------- update lights and materials from the UI state ---------------
+            directionalLight.setDirection([directionalLightState.direction.x, directionalLightState.direction.y, directionalLightState.direction.z, 0.0]);
+            directionalLight.setColor([directionalLightState.color.r, directionalLightState.color.g, directionalLightState.color.b, directionalLightState.color.a]);
+            directionalLight.setEnabled(directionalLightState.enabled);
+            directionalLight.setIntensity(directionalLightState.intensity);
+            //--------------- end update lights and materials from the UI state ---------------
+
+            input();
+
+            grid.update(dt);
+        }
+
+        /**
+         * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
+         */
+        function render() {
+            // Rendering logic goes here (e.g., issuing draw calls)
+            const encoder = pGraphics.device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+                colorAttachments: [{
+                    view: pGraphics.context.getCurrentTexture().createView(),
+                    loadOp: "clear",
+                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a },
+                    storeOp: "store",
+                }],
+
+                depthStencilAttachment: {
+                    view: depthTexture.createView(),
+                    depthClearValue: 1.0, // 1.0 is the farthest point
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store',
+                }
+            });
+
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
+            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
+
+            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
+
+            pass.setPipeline(wireframePipeline.getWebGPUPipeline());
+            pass.setBindGroup(2, propsBindGroup); // Bind group para Props
+            grid.render(pass);
+
+            pass.end();
+
+            const commandBuffer = encoder.finish();
+
+            // Finish the command buffer and immediately submit it.
+            pGraphics.device.queue.submit([commandBuffer]);
+            //console.log("Frame rendered");
+        }
+
+        /**
+         * Combines the update and render functions into a single loop that runs on each animation frame.
+         * @param {float} currentTime - The current time in milliseconds.
+         */
+        function updateAndRender(currentTime) {
+            update(currentTime);
+            render();
+
+            requestAnimationFrame(updateAndRender);
+        }
+
+    </script>
+</body>
+
+</html>
