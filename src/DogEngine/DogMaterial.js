@@ -20,7 +20,7 @@ class DogMaterial extends DogResource {
         this.normalMapIndex = "";
         this.bumpMapIndex = "";
         this.roughness = 0.0;
-        this.metallness = 0.0;
+        this.metallic = 0.0;
         this.fresnel = 0.0;
         this.has_Texture = false;
         this.bufferSize = 24 * 4;
@@ -150,11 +150,11 @@ class DogMaterial extends DogResource {
     }
 
     /**
-     * Set the metallness
-     * @param {float} metallness 
+     * Set the metallic
+     * @param {float} metallic 
      */
-    setMetallness(metallness) {
-        this.metallness = metallness;
+    setMetallic(metallic) {
+        this.metallic = metallic;
     }
 
     /**
@@ -285,9 +285,9 @@ class DogMaterial extends DogResource {
             this.transparency,
             this.opticalDensity,
             this.roughness,
-            this.metallness,
+            this.metallic,
             this.fresnel,
-            this.has_Texture ? 1 : 0,
+            this.has_Texture ? 1.0 : 0.0,
             0 //padding
         ]);
     }

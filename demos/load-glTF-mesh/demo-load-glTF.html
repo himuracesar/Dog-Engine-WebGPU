@@ -198,13 +198,6 @@
         emitUI();
     </script>
 
-    <script type="module">
-        //import { WebIO } from '../../DogEngine/lib/gltf-transform/core/index.js';
-        //import { WebIO } from '.../../DogEngine/lib/gltf-transform-core.js';
-    </script>
-
-    <script type="text/javascript" src="/src/DogEngine/pipeline/structs/LightsAndMaterial.js"></script>
-
     <script type="text/javascript" src="/src/DogEngine/WebGPU-Engine.js"></script>
     <script type="text/javascript" src="/src/DogEngine/lib/gl-matrix-min.js"></script>
     <script type="text/javascript" src="/src/DogEngine/DogCamera.js"></script>
@@ -213,6 +206,8 @@
     <script type="text/javascript" src="/src/DogEngine/light/DogDirectionalLight.js"></script>
     <script type="text/javascript" src="/src/DogEngine/pipeline/DogPipeline.js"></script>
     <script type="text/javascript" src="/src/DogEngine/pipeline/WireframePipeline.js"></script>
+
+    <script type="text/javascript" src="pipeline/GeneralPipeline.js"></script>
 </head>
 
 <body onload="init();">
@@ -242,6 +237,7 @@
         //***************************************************
 
         let wireframePipeline;
+        let cookTorrancePipeline;
 
         let camera;
 
@@ -253,6 +249,16 @@
 
         let propsBindGroup;
         let propsBindGroupLayout;
+
+        let shiba;
+        let woody;
+        let sourceress;
+        let mecha;
+        let monster;
+        let owl;
+        let owlglTF;
+        let fpsMap;
+        let stoneWall;
 
         //------------------- Demo's main functions -------------------
         function createShapes() {
@@ -277,6 +283,65 @@
             ];
 
             wireframePipeline = new WireframePipeline(bglWireframe);
+
+            let bindGroupLayout = [
+                resourceManager.getBindGroupLayout(0),
+                resourceManager.getBindGroupLayout(1),
+                resourceManager.getBindGroupLayout(2),
+                resourceManager.getBindGroupLayout(3),
+            ];
+
+            let cookTorranceShaders = [
+                await webGPUengine.readFileAsText("shaders/Common.wgsl"),
+                await webGPUengine.readFileAsText("shaders/LightsAndMaterial.wgsl"),
+                await webGPUengine.readFileAsText("shaders/CookTorranceShader.wgsl")
+            ];
+
+            cookTorranceShadingPipeline = new GeneralPipeline("cook-torrance", bindGroupLayout, cookTorranceShaders);
+        }
+
+        async function loadMeshes() {
+            woody = await webGPUengine.createMeshByGltfFile("woody", "/resources/models/woody_psp_rig_toy_story_3/scene.gltf");
+            //woody.getTransform().scaleAbsolute(20.0, 20.0, 20.0);
+            //woody.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+            woody.getTransform().translateAbsolute(20.0, 20.0, 0.0);
+
+            mecha = await webGPUengine.createMeshByGltfFileV2("mecha", "/resources/models/bot_mecha_warrior/scene.gltf");
+            mecha.getTransform().translateAbsolute(0.0, 0.0, -50.0);
+            mecha.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+
+            monster = await webGPUengine.createMeshByGltfFile("monster", "/resources/models/a_horror_monster.glb");
+            monster.getTransform().translateAbsolute(100.0, 20.0, -100.0);
+            monster.getTransform().rotateAbsolute(0.0, 0.0, 0.0);
+            monster.getTransform().scaleAbsolute(20.0, 20.0, 20.0);
+
+            shiba = await webGPUengine.createMeshByGltfFileV2("shiba", "/resources/models/shiba/scene.gltf");
+            shiba.getTransform().scaleAbsolute(20.0, 20.0, 20.0);
+            shiba.getTransform().rotateAbsolute(-Math.PI / 2.0, Math.PI, 0.0);
+            shiba.getTransform().translateAbsolute(0.0, 20.0, 0.0);
+
+            sourceress = await webGPUengine.createMeshByGltfFileV2("sourceress", "/resources/models/sorceress/scene.gltf");
+            sourceress.getTransform().translateAbsolute(-50.0, 50.0, 0.0);
+            sourceress.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+            sourceress.getTransform().scaleAbsolute(5.0, 5.0, 5.0);
+
+            //fpsMap = await webGPUengine.createMeshByGltfFile("fpsMap", "/resources/models/lowpoly_fps__map/scene.gltf");
+            /*fpsMap = await webGPUengine.createMeshByGltfFileV2("fpsMap", "/resources/models/lowpoly__fps_game__map.glb");
+            fpsMap.getTransform().translateAbsolute(0.0, 0.0, 0.0);
+            fpsMap.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+            fpsMap.getTransform().scaleAbsolute(20.0, 20.0, 20.0);*/
+
+            //stoneWall = await webGPUengine.createMeshByGltfFileV2("stoneWall", "/resources/models/StoneWall_V2.glb");
+
+            owl = await webGPUengine.createMeshByGltfFile("owl", "/resources/models/black_owl_familiar__amber-eyed_dark_fantasy.glb");
+            owl.getTransform().translateAbsolute(-100.0, 20.0, -100.0);
+            owl.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+            owl.getTransform().scaleAbsolute(20.0, 20.0, 20.0);
+
+            owlglTF = await webGPUengine.createMeshByGltfFile("owl-gltf", "/resources/models/black_owl_familiar/scene.gltf");
+            owlglTF.getTransform().translateAbsolute(-80.0, 20.0, -100.0);
+            owlglTF.getTransform().rotateAbsolute(-Math.PI / 2.0, 0.0, 0.0);
+            owlglTF.getTransform().scaleAbsolute(20.0, 20.0, 20.0);
         }
 
         function createProps() {
@@ -311,7 +376,7 @@
         }
 
         function createLights() {
-            directionalLight = new DogDirectionalLight(true, false);
+            directionalLight = new DogDirectionalLight(true, true);
             directionalLight.setEnabled(true);
 
             directionalLightState.color.r = directionalLight.getColor()[0];
@@ -355,13 +420,14 @@
 
             camera = new DogCamera();
             camera.setPosition([0.0, 0.0, 100.0]);
-            camera.setSpeed(5.0);
+            camera.setSpeed(0.75);
             camera.setFarPlane(4000.0);
 
             createShapes();
             createLights();
             createProps();
             await createPipeline();
+            await loadMeshes();
 
             const overlay = document.getElementById('loading-overlay');
             overlay.classList.add('hidden');
@@ -466,6 +532,15 @@
             input();
 
             grid.update(dt);
+            shiba.update(dt);
+            sourceress.update(dt);
+            //stoneWall.update(dt);
+            woody.update(dt);
+            mecha.update(dt);
+            monster.update(dt);
+            //fpsMap.update(dt);
+            owl.update(dt);
+            owlglTF.update(dt);
         }
 
         /**
@@ -493,9 +568,25 @@
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
             pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
 
+            pGraphics.device.queue.writeBuffer(directionalLight.getBuffer().getWebGPUBuffer(), 0, directionalLight.getData());
+
             pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
+            pass.setBindGroup(1, directionalLight.getBindGroup());
+            pass.setBindGroup(2, null);
+
+            pass.setPipeline(cookTorranceShadingPipeline.getWebGPUPipeline());
+            shiba.render(pass);
+            sourceress.render(pass);
+            woody.render(pass);
+            mecha.render(pass);
+            monster.render(pass);
+            //fpsMap.render(pass);
+            //stoneWall.render(pass);
+            owl.render(pass);
+            owlglTF.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
+            pass.setBindGroup(1, null);
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props
             grid.render(pass);
 

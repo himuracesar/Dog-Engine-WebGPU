@@ -372,7 +372,7 @@ const GPUVisibility = Object.freeze({
      * @param {string} fileName Name/Id of the texture (id of the resource).
      * @returns {DogTexture} The texture if the creation and stores in the resource manager is ok, null otherwise.
      */
-    async function createDogTextureFromImage(fileName) {
+    async function createDogTextureFromImage(fileName, flipY = false) {
         let index = fileName.length;
         while (fileName[index] != "/")
             index--;
@@ -397,7 +397,7 @@ const GPUVisibility = Object.freeze({
         });
 
         pGraphics.device.queue.copyExternalImageToTexture(
-            { source: imageBitmap },//, flipY: true },
+            { source: imageBitmap, flipY: flipY },
             { texture: gpuTexture },
             [imageBitmap.width, imageBitmap.height]
         );
@@ -687,7 +687,7 @@ const GPUVisibility = Object.freeze({
             material.setIdBindGroup(idBindGroupMaterial);
         }
 
-        /** Load geometry */
+        /** Bind group for transformation matrix */
         const bufferSizeMeshes = 16 * 4 * obj.geometries.length;
         let idBufferMeshes = createDogBuffer(name + "-buffer-meshes", BufferType.Data, null, bufferSizeMeshes, true);
 
@@ -744,6 +744,469 @@ const GPUVisibility = Object.freeze({
         staticMesh.setIdVertexBuffer("Vb-" + name);
 
         return staticMesh;
+    }
+
+    /**
+     * Create a static mesh from a glTF or glb file.
+     * @param {string} name Name of the mesh. This will be the ID to refer the mesh.
+     * @param {string} fileName File name of the mesh.
+     * @returns {DogStaticMesh} The static mesh.
+     */
+    async function createMeshByGltfFile(name, fileName) {
+        let index = fileName.length;
+        while (fileName[index] != "/")
+            index--;
+
+        let basePath = fileName.substring(0, index + 1);
+        let namef = fileName.substring(index + 1, fileName.length);
+        let extensionFile = namef.substring(namef.length - 4, namef.length);
+
+        const { WebIO } = await import('@gltf-transform/core');
+
+        const io = new WebIO();
+        const document = await io.read(fileName);
+        const root = document.getRoot();
+
+        let vertices = [];
+        let indices = [];
+
+        let staticMesh = new DogStaticMesh();
+        let countMeshes = 0;
+        let indexFormat = '';
+
+        /** Bind group for transformation matrix */
+        const bufferSizeMeshes = 16 * 4 * root.listMeshes().length;
+        let idBufferMeshes = createDogBuffer(name + "-buffer-meshes", BufferType.Data, null, bufferSizeMeshes, true);
+
+        const jsonMeshes = {
+            label: "Meshes Bind Group",
+            layout: resourceManager.getBindGroupLayout(3),
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: resourceManager.get(idBufferMeshes).getWebGPUBuffer() }
+                }
+            ]
+        };
+
+        let idBindGroupMeshes = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMeshes);
+
+        // Recorrer las mallas del archivo glTF
+        for (const mesh of root.listMeshes()) {
+            for (const primitive of mesh.listPrimitives()) {
+                // 1. Extraer los datos de Atributos de Vértices
+                const positionAttr = primitive.getAttribute('POSITION');
+                const normalAttr = primitive.getAttribute('NORMAL');
+                const uvAttr = primitive.getAttribute('TEXCOORD_0');
+
+                const positionArray = positionAttr.getArray(); // Float32Array
+                const normalArray = normalAttr ? normalAttr.getArray() : null; // Float32Array
+                const uvArray = uvAttr ? uvAttr.getArray() : null; // Float32Array
+
+                let baseVertex = (vertices.length > 0) ? vertices.length / 8 : 0;
+                let iTex = 0;
+
+                for (let i = 0; i < positionArray.length; i += 3) {
+                    vertices.push(positionArray[i]);
+                    vertices.push(positionArray[i + 1]);
+                    vertices.push(positionArray[i + 2]);
+                    vertices.push(normalArray[i]);
+                    vertices.push(normalArray[i + 1]);
+                    vertices.push(normalArray[i + 2]);
+
+                    if (uvArray != null && typeof uvArray != undefined && uvArray.length > 0) {
+                        vertices.push(uvArray[iTex++]);
+                        vertices.push(uvArray[iTex++]);
+                    } else {
+                        vertices.push(0.0);
+                        vertices.push(0.0);
+                    }
+                }
+
+                let numVertices = positionArray.length / 3;
+
+                let numIndices = 0;
+                let firstIndex = 0;
+
+                // 3. Extraer Índices (si la geometría está indexada)
+                const indicesAttr = primitive.getIndices();
+
+                if (indicesAttr) {
+                    const indicesArray = indicesAttr.getArray(); // Uint16Array o Uint32Array
+                    indexFormat = indicesArray instanceof Uint16Array ? 'uint16' : 'uint32';
+
+                    numIndices = indicesArray.length;
+                    firstIndex = indices.length;
+                    for (let i = 0; i < indicesArray.length; i++) {
+                        indices.push(indicesArray[i]);
+                    }
+                }
+
+                let material = null;
+                let nameMaterial = "";
+                const materialGltf = primitive.getMaterial();
+                if (materialGltf) {
+                    nameMaterial = (materialGltf && materialGltf.getName()) ? materialGltf.getName() : name + "-material";
+                    // 1. Propiedades PBR básicas (Metallic-Roughness)
+                    const baseColorFactor = materialGltf.getBaseColorFactor(); // [R, G, B, A] (0.0 a 1.0)
+                    const roughnessFactor = materialGltf.getRoughnessFactor(); // 0.0 (liso) a 1.0 (rugoso)
+                    const metallicFactor = materialGltf.getMetallicFactor();   // 0.0 (dieléctrico) a 1.0 (metálico)
+                    const emissiveFactor = materialGltf.getEmissiveFactor();   // [R, G, B]
+
+                    material = new DogMaterial(nameMaterial, true, false);
+                    material.setDiffuseColor([baseColorFactor[0], baseColorFactor[1], baseColorFactor[2], baseColorFactor[3]]);
+                    material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
+                    material.setAmbientColor([baseColorFactor[0] / 10.0, baseColorFactor[1] / 10.0, baseColorFactor[2] / 10.0, 1.0]);
+                    material.setRoughness(roughnessFactor);
+                    material.setMetallic(metallicFactor);
+                    material.setEmissiveColor([emissiveFactor[0], emissiveFactor[1], emissiveFactor[2], 1.0]);
+
+                    // 2. Extracción de Texturas asociadas a este material
+                    // Cada textura en glTF-Transform se obtiene mediante slots específicos:
+                    const baseColorTex = materialGltf.getBaseColorTexture();
+                    if (baseColorTex) {
+                        if (extensionFile == "gltf") {
+                            const uri = baseColorTex.getURI();
+                            baseColorTex.setURI(basePath + uri);
+
+                            let albedoTexture = await webGPUengine.createDogTextureFromImage(basePath + uri);
+
+                            material.setDiffuseTextureIndex(albedoTexture.getName());
+                            material.setHasTexture(true);
+
+                            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                            albedoTexture.setIdSampler(sampler.getName());
+
+                            let idBindGroupMaterial = createBGMaterialTexSamp(material, albedoTexture, sampler, 2);
+                            material.setIdBindGroup(idBindGroupMaterial);
+                        } else { //glb file
+                            let albedoTexture = await createDogTextureFromBytes(name + "-albedo", baseColorTex);
+                            material.setDiffuseTextureIndex(albedoTexture.getName());
+                            //material.setHasTexture(true);
+
+                            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                            albedoTexture.setIdSampler(sampler.getName());
+
+                            let idBindGroupMaterial = createBGMaterialTexSamp(material, albedoTexture, sampler, 2);
+                            material.setIdBindGroup(idBindGroupMaterial);
+
+                            console.log("Albedo GLB:: " + countMeshes + " idBindGroup: " + idBindGroupMaterial);
+                        }
+                    } else {
+                        let texture = createDummyTexture();
+                        let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+
+                        material.setDiffuseTextureIndex(texture.getName());
+                        material.setHasTexture(true);
+
+                        texture.setIdSampler(sampler.getName());
+                        let idBindGroupMaterial = createBGMaterialTexSamp(material, texture, sampler, 2);
+                        material.setIdBindGroup(idBindGroupMaterial);
+                    }
+                } else {
+                    nameMaterial = name + "-default-material";
+                    const bufferSizeMaterial = 24 * 4 * 1; //lenMaterials;
+                    let idBufferMaterial = createDogBuffer(name + "-buffer-material", BufferType.Data, null, bufferSizeMaterial, true);
+                    let texture = createDummyTexture();
+
+                    material = createDefaultMaterial(nameMaterial, false, false);
+                    material.setIdBuffer(idBufferMaterial);
+
+                    material.setDiffuseTextureIndex(texture.getName());
+                    material.setHasTexture(true);
+
+                    let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                    texture.setIdSampler(sampler.getName());
+
+                    let idBindGroupMaterial = createBGMaterialTexSamp(material, texture, sampler, 2);
+
+                    material.setIdBindGroup(idBindGroupMaterial);
+                }
+
+                resourceManager.add(material.getName(), material);
+
+                let mesh = new DogMesh(name + countMeshes++, false, false);
+                mesh.setNumVertices(numVertices);
+                mesh.setBaseVertex(baseVertex);
+                mesh.setFirstVertex(baseVertex);
+                mesh.setNumIndices(numIndices);
+                mesh.setFirstIndex(firstIndex);
+                mesh.setIdMaterial(nameMaterial);
+                mesh.setIdBuffer(idBufferMeshes);
+                mesh.setIdBindGroup(idBindGroupMeshes);
+
+                staticMesh.addMesh(mesh);
+            }
+        }
+
+        webGPUengine.createDogBuffer("Vb-" + name, BufferType.Vertex, new Float32Array(vertices), 0, true);
+
+        if (indexFormat == 'uint32')
+            webGPUengine.createDogBuffer("Ib-" + name, BufferType.Index, new Uint32Array(indices), 0, true);
+        else if (indexFormat == 'uint16')
+            webGPUengine.createDogBuffer("Ib-" + name, BufferType.Index, new Uint16Array(indices), 0, true);
+
+        staticMesh.setIdVertexBuffer("Vb-" + name);
+        staticMesh.setIdIndexBuffer("Ib-" + name);
+
+        return staticMesh;
+    }
+
+    /**
+     * Creates a DogStaticMesh from a glTF or glb file.
+     * @param {string} name The name of the mesh.
+     * @param {string} fileName The path to the glTF or glb file.
+     * @returns {DogStaticMesh} The created DogStaticMesh.
+     */
+    async function createMeshByGltfFileV2(name, fileName) {
+        let index = fileName.length;
+        while (fileName[index] != "/")
+            index--;
+
+        let namef = fileName.substring(index + 1, fileName.length);
+
+        const { WebIO } = await import('@gltf-transform/core');
+
+        const io = new WebIO();
+        const document = await io.read(fileName);
+        const root = document.getRoot();
+
+        const scene = root.getDefaultScene();
+
+        if (!scene) {
+            console.log("The file " + name + " doesn't have a default scene.");
+            return;
+        }
+
+        // The root nodes of the scene
+        const rootNodes = scene.listChildren();
+
+        const staticMesh = new DogStaticMesh();
+        const helperObj = {};
+        helperObj.vertices = [];
+        helperObj.indices = [];
+        helperObj.indexFormat = '';
+        helperObj.countMeshes = 0;
+        helperObj.extensionFile = namef.substring(namef.length - 4, namef.length);
+        helperObj.basePath = fileName.substring(0, index + 1);
+
+        /** Bind group for transformation matrix */
+        const bufferSizeMeshes = 16 * 4 * root.listMeshes().length;
+        helperObj.idBufferMeshes = createDogBuffer(name + "-buffer-meshes", BufferType.Data, null, bufferSizeMeshes, true);
+
+        const jsonMeshes = {
+            label: "Meshes Bind Group",
+            layout: resourceManager.getBindGroupLayout(3),
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: resourceManager.get(helperObj.idBufferMeshes).getWebGPUBuffer() }
+                }
+            ]
+        };
+
+        helperObj.idBindGroupMeshes = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMeshes);
+
+        for (const rootNode of rootNodes) {
+            await traverseNode(name, rootNode, -1, staticMesh, helperObj); // RecurSIvidad para el árbol
+        }
+
+        webGPUengine.createDogBuffer("Vb-" + name, BufferType.Vertex, new Float32Array(helperObj.vertices), 0, true);
+
+        if (helperObj.indexFormat == 'uint32')
+            webGPUengine.createDogBuffer("Ib-" + name, BufferType.Index, new Uint32Array(helperObj.indices), 0, true);
+        else if (helperObj.indexFormat == 'uint16')
+            webGPUengine.createDogBuffer("Ib-" + name, BufferType.Index, new Uint16Array(helperObj.indices), 0, true);
+
+        staticMesh.setIdVertexBuffer("Vb-" + name);
+        staticMesh.setIdIndexBuffer("Ib-" + name);
+
+        return staticMesh;
+    }
+
+    /**
+     * Traverses a node in the glTF file and creates a DogStaticMesh from it.
+     * @param {string} name The name of the mesh.
+     * @param {Object} node The node to traverse.
+     * @param {number} parent The ID of the parent node.
+     * @param {DogStaticMesh} staticMesh The DogStaticMesh to add the mesh to.
+     * @param {Object} helperObj The helper object containing the mesh data.
+     */
+    async function traverseNode(name, node, parent, staticMesh, helperObj) {
+        const nodeName = node.getName() || name + '-node';
+
+        helperObj.translation = node.getTranslation();
+        helperObj.scale = node.getScale();
+
+        const quaternion = node.getRotation();
+        helperObj.rotation = glMatrix.vec3.create();
+        quaternionToEuler(helperObj.rotation, quaternion);
+
+        const mesh = node.getMesh();
+        if (mesh) {
+            await inspectMeshGeometry(name, mesh, parent, staticMesh, helperObj);
+            parent = staticMesh.getNumMeshes() - 1;
+        }
+
+        for (const child of node.listChildren()) {
+            await traverseNode(name, child, parent, staticMesh, helperObj);
+        }
+    }
+
+    /**
+     * Inspects the geometry of a mesh and creates a DogStaticMesh from it.
+     * @param {string} name The name of the mesh.
+     * @param {Object} mesh The mesh to inspect.
+     * @param {number} parent The ID of the parent node.
+     * @param {DogStaticMesh} staticMesh The DogStaticMesh to add the mesh to.
+     * @param {Object} helperObj The helper object containing the mesh data.
+     */
+    async function inspectMeshGeometry(name, mesh, parent, staticMesh, helperObj) {
+        for (const primitive of mesh.listPrimitives()) {
+            const positionAttr = primitive.getAttribute('POSITION');
+            const normalAttr = primitive.getAttribute('NORMAL');
+            const uvAttr = primitive.getAttribute('TEXCOORD_0');
+
+            const positionArray = positionAttr.getArray(); // Float32Array
+            const normalArray = normalAttr ? normalAttr.getArray() : null; // Float32Array
+            const uvArray = uvAttr ? uvAttr.getArray() : null; // Float32Array
+
+            let baseVertex = (helperObj.vertices.length > 0) ? helperObj.vertices.length / 8 : 0;
+            let iTex = 0;
+
+            for (let i = 0; i < positionArray.length; i += 3) {
+                helperObj.vertices.push(positionArray[i]);
+                helperObj.vertices.push(positionArray[i + 1]);
+                helperObj.vertices.push(positionArray[i + 2]);
+                helperObj.vertices.push(normalArray[i]);
+                helperObj.vertices.push(normalArray[i + 1]);
+                helperObj.vertices.push(normalArray[i + 2]);
+
+                if (uvArray != null && typeof uvArray != undefined && uvArray.length > 0) {
+                    helperObj.vertices.push(uvArray[iTex++]);
+                    helperObj.vertices.push(uvArray[iTex++]);
+                } else {
+                    helperObj.vertices.push(0.0);
+                    helperObj.vertices.push(0.0);
+                }
+            }
+
+            let numVertices = positionArray.length / 3;
+
+            let numIndices = 0;
+            let firstIndex = 0;
+
+            const indicesAttr = primitive.getIndices();
+
+            if (indicesAttr) {
+                const indicesArray = indicesAttr.getArray();
+                helperObj.indexFormat = indicesArray instanceof Uint16Array ? 'uint16' : 'uint32';
+
+                numIndices = indicesArray.length;
+                firstIndex = helperObj.indices.length;
+                for (let i = 0; i < indicesArray.length; i++) {
+                    helperObj.indices.push(indicesArray[i]);
+                }
+            }
+
+            let material = null;
+            let nameMaterial = "";
+            const materialGltf = primitive.getMaterial();
+            if (materialGltf) {
+                nameMaterial = (materialGltf && materialGltf.getName()) ? materialGltf.getName() : name + "-material";
+
+                const baseColorFactor = materialGltf.getBaseColorFactor(); // [R, G, B, A] (0.0 a 1.0)
+                const roughnessFactor = materialGltf.getRoughnessFactor(); // 0.0 (liso) a 1.0 (rough)
+                const metallicFactor = materialGltf.getMetallicFactor();   // 0.0 (dielectric) a 1.0 (metal)
+                const emissiveFactor = materialGltf.getEmissiveFactor();   // [R, G, B]
+
+                material = new DogMaterial(nameMaterial, true, false);
+                material.setDiffuseColor([baseColorFactor[0], baseColorFactor[1], baseColorFactor[2], baseColorFactor[3]]);
+                material.setSpecularColor([1.0, 1.0, 1.0, 1.0]);
+                material.setAmbientColor([baseColorFactor[0] / 10.0, baseColorFactor[1] / 10.0, baseColorFactor[2] / 10.0, 1.0]);
+                material.setRoughness(roughnessFactor);
+                material.setMetallic(metallicFactor);
+                material.setEmissiveColor([emissiveFactor[0], emissiveFactor[1], emissiveFactor[2], 1.0]);
+
+                const baseColorTex = materialGltf.getBaseColorTexture();
+                if (baseColorTex) {
+                    if (helperObj.extensionFile == "gltf") {
+                        const uri = baseColorTex.getURI();
+                        baseColorTex.setURI(helperObj.basePath + uri);
+
+                        let albedoTexture = await webGPUengine.createDogTextureFromImage(helperObj.basePath + uri);
+
+                        material.setDiffuseTextureIndex(albedoTexture.getName());
+                        material.setHasTexture(true);
+
+                        let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                        albedoTexture.setIdSampler(sampler.getName());
+
+                        let idBindGroupMaterial = createBGMaterialTexSamp(material, albedoTexture, sampler, 2);
+                        material.setIdBindGroup(idBindGroupMaterial);
+                    } else { //glb file
+                        let albedoTexture = await createDogTextureFromBytes(name + "-albedo", baseColorTex);
+                        material.setDiffuseTextureIndex(albedoTexture.getName());
+                        //material.setHasTexture(true);
+
+                        let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                        albedoTexture.setIdSampler(sampler.getName());
+
+                        let idBindGroupMaterial = createBGMaterialTexSamp(material, albedoTexture, sampler, 2);
+                        material.setIdBindGroup(idBindGroupMaterial);
+
+                        //console.log("Albedo GLB:: " + countMeshes + " idBindGroup: " + idBindGroupMaterial);
+                    }
+                } else {
+                    let texture = createDummyTexture();
+                    let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+
+                    material.setDiffuseTextureIndex(texture.getName());
+                    //material.setHasTexture(true);
+
+                    texture.setIdSampler(sampler.getName());
+                    let idBindGroupMaterial = createBGMaterialTexSamp(material, texture, sampler, 2);
+                    material.setIdBindGroup(idBindGroupMaterial);
+                }
+            } else {
+                nameMaterial = name + "-default-material";
+                const bufferSizeMaterial = 24 * 4 * 1;
+                let idBufferMaterial = createDogBuffer(name + "-buffer-material", BufferType.Data, null, bufferSizeMaterial, true);
+                let texture = createDummyTexture();
+
+                material = createDefaultMaterial(nameMaterial, false, false);
+                material.setIdBuffer(idBufferMaterial);
+
+                material.setDiffuseTextureIndex(texture.getName());
+                material.setHasTexture(true);
+
+                let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+                texture.setIdSampler(sampler.getName());
+
+                let idBindGroupMaterial = createBGMaterialTexSamp(material, texture, sampler, 2);
+
+                material.setIdBindGroup(idBindGroupMaterial);
+            }
+
+            resourceManager.add(material.getName(), material);
+
+            let dogMesh = new DogMesh(name + helperObj.countMeshes++, false, false);
+            dogMesh.setNumVertices(numVertices);
+            dogMesh.setBaseVertex(baseVertex);
+            dogMesh.setFirstVertex(baseVertex);
+            dogMesh.setNumIndices(numIndices);
+            dogMesh.setFirstIndex(firstIndex);
+            dogMesh.setIdMaterial(nameMaterial);
+            dogMesh.setIdBuffer(helperObj.idBufferMeshes);
+            dogMesh.setIdBindGroup(helperObj.idBindGroupMeshes);
+            dogMesh.setIdParent(parent);
+
+            dogMesh.getTransform().translateAbsolute(helperObj.translation[0], helperObj.translation[1], helperObj.translation[2]);
+            dogMesh.getTransform().scaleAbsolute(helperObj.scale[0], helperObj.scale[1], helperObj.scale[2]);
+            dogMesh.getTransform().rotateAbsolute(helperObj.rotation[0], helperObj.rotation[1], helperObj.rotation[2]);
+
+            staticMesh.addMesh(dogMesh);
+        }
     }
 
     /**
@@ -834,75 +1297,74 @@ const GPUVisibility = Object.freeze({
         return vectors;
     }
 
-    /****
-     TODO Check this
-
-     import { mat4, vec3 } from 'gl-matrix';
-    */
     /**
-     * Calcula dinámicamente la matriz de vista y la matriz ortogonal para la luz.
-     * @param {vec3} lightPos - Posición de la luz en el mundo.
-     * @param {vec3} lightTarget - Punto al que mira la luz.
-     * @param {Array} sceneBounds - Lista de puntos mínimos y máximos de los objetos en el mundo.
+     * Calculates dynamically the view matrix and the orthogonal matrix for the light.
+     * @param {Vector3} lightPos - Position of the light in the world.
+     * @param {Vector3} lightTarget - Point to which the light looks at.
+     * @param {Array} sceneBounds - List of minimum and maximum points of the objects in the world.
+     * @param {number} padding - Padding to be added to the scene bounds.
      */
     function calculateDynamicLightMatrices(lightPos, lightTarget, sceneBounds, padding) {
-        // 1. Calcular el vector UP dinámico para evitar singularidades
+        // 1. Calculate the dynamic UP vector to avoid singularities
         let lightDir = glMatrix.vec3.create();
         glMatrix.vec3.sub(lightDir, lightTarget, lightPos);
         glMatrix.vec3.normalize(lightDir, lightDir);
 
         let lightUp = glMatrix.vec3.fromValues(0, 1, 0);
-        // Si la luz apunta casi verticalmente hacia abajo o arriba, cambiamos el UP al eje Z
+        // If the light points almost vertically downwards or upwards, we change the UP to the Z axis
         if (Math.abs(lightDir[0]) < 0.001 && Math.abs(lightDir[2]) < 0.001) {
             lightUp = glMatrix.vec3.fromValues(0, 0, -1);
         }
 
-        // 2. Construir la Matriz de Vista de la Luz
+        // 2. Build the View Matrix of the Light
         let lightViewMatrix = glMatrix.mat4.create();
         glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightUp);
-        //glMatrix.mat4.lookAt(lightViewMatrix, lightPos, lightTarget, lightDir);
-        //glMatrix.mat4.invert(lightViewMatrix, lightViewMatrix);
 
-        // 3. Encontrar los límites en el espacio de la luz
+        // 3. Find the bounds in the light's space
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
 
-        // Transformamos las esquinas de los objetos al espacio de la luz
+        // Transform the corners of the objects to the light's space
         for (const worldPoint of sceneBounds) {
             let lightSpacePoint = glMatrix.vec3.create();
             glMatrix.vec3.transformMat4(lightSpacePoint, worldPoint, lightViewMatrix);
 
             // Actualizamos los extremos de nuestra caja ortogonal
-            if (lightSpacePoint[0] < minX) minX = lightSpacePoint[0];
-            if (lightSpacePoint[0] > maxX) maxX = lightSpacePoint[0];
+            if (lightSpacePoint[0] < minX)
+                minX = lightSpacePoint[0];
+            if (lightSpacePoint[0] > maxX)
+                maxX = lightSpacePoint[0];
 
-            if (lightSpacePoint[1] < minY) minY = lightSpacePoint[1];
-            if (lightSpacePoint[1] > maxY) maxY = lightSpacePoint[1];
+            if (lightSpacePoint[1] < minY)
+                minY = lightSpacePoint[1];
+            if (lightSpacePoint[1] > maxY)
+                maxY = lightSpacePoint[1];
 
-            if (lightSpacePoint[2] < minZ) minZ = lightSpacePoint[2];
-            if (lightSpacePoint[2] > maxZ) maxZ = lightSpacePoint[2];
+            if (lightSpacePoint[2] < minZ)
+                minZ = lightSpacePoint[2];
+            if (lightSpacePoint[2] > maxZ)
+                maxZ = lightSpacePoint[2];
         }
 
-        // 4. Añadir un pequeño margen de seguridad (Padding)
-        // Esto evita que las sombras se corten abruptamente en los bordes debido al sesgo numérico
-        //const padding = 400.0;
+        // 4. Add a small safety margin (Padding)
+        // This prevents shadows from being cut off abruptly at the edges due to numerical bias
         let left = minX - padding;
         let right = maxX + padding;
         let bottom = minY - padding;
         let top = maxY + padding;
 
-        // WebGPU requiere Z entre 0 y 1. 
-        // En el espacio de la luz de glMatrix, mirar "hacia adelante" entra en el eje Z negativo.
-        // Por lo tanto, el objeto más cercano a la luz tendrá el valor Z más alto (menos negativo),
-        // y el más lejano tendrá el valor Z más bajo (más negativo).
+        // WebGPU requires Z between 0 and 1.
+        // In glMatrix light space, looking "forward" enters the negative Z axis.
+        // Therefore, the object closest to the light will have the highest Z value (least negative),
+        // and the furthest will have the lowest Z value (most negative).
         let near = -maxZ - padding;
         let far = -minZ + padding;
 
-        // Forzar un near mínimo para evitar errores si la luz está encima de un objeto
+        // Force a minimum near to avoid errors if the light is above an object
         if (near < 0.1) near = 0.1;
 
-        // 5. Construir la Matriz Ortogonal para WebGPU (Zero-to-One)
+        // 5. Construct the Orthogonal Matrix for WebGPU (Zero-to-One)
         let lightProjectionMatrix = glMatrix.mat4.create();
         glMatrix.mat4.orthoZO(lightProjectionMatrix, left, right, bottom, top, near, far);
 
@@ -910,6 +1372,37 @@ const GPUVisibility = Object.freeze({
             viewMatrix: lightViewMatrix,
             projectionMatrix: lightProjectionMatrix
         };
+    }
+
+    /**
+     * Converts a quaternion to Euler angles.
+     * @param {Vector3} out - Array to store the Euler angles.
+     * @param {Quaternion} q - Quaternion to convert.
+     * @returns {Vector3} Array of Euler angles.
+     */
+    function quaternionToEuler(out, q) {
+        let x = q[0], y = q[1], z = q[2], w = q[3];
+        let x2 = x * x, y2 = y * y, z2 = z * z, w2 = w * w;
+        let unit = x2 + y2 + z2 + w2;
+        let test = x * w - y * z;
+
+        if (test > 0.499995 * unit) {
+            // Singularity at north pole
+            out[0] = Math.PI / 2;
+            out[1] = 2 * Math.atan2(y, x);
+            out[2] = 0;
+        } else if (test < -0.499995 * unit) {
+            // Singularity at south pole
+            out[0] = -Math.PI / 2;
+            out[1] = 2 * Math.atan2(y, x);
+            out[2] = 0;
+        } else {
+            out[0] = Math.asin(2 * (x * z - w * y));
+            out[1] = Math.atan2(2 * (x * w + y * z), 1 - 2 * (z2 + w2));
+            out[2] = Math.atan2(2 * (x * y + z * w), 1 - 2 * (y2 + z2));
+        }
+
+        return out;
     }
 
     return {
@@ -927,11 +1420,14 @@ const GPUVisibility = Object.freeze({
         createDogSampler: createDogSampler,
         createDefaultMaterial: createDefaultMaterial,
         createMeshByObjFile: createMeshByObjFile,
+        createMeshByGltfFile: createMeshByGltfFile,
+        createMeshByGltfFileV2: createMeshByGltfFileV2,
         createShaderModule: createShaderModule,
         createVertexBufferLayout: createVertexBufferLayout,
         createPipelineLayout: createPipelineLayout,
         getAllMinAndMaxVectorInMeshes: getAllMinAndMaxVectorInMeshes,
-        calculateDynamicLightMatrices: calculateDynamicLightMatrices
+        calculateDynamicLightMatrices: calculateDynamicLightMatrices,
+        quaternionToEuler: quaternionToEuler
     }
 
 })

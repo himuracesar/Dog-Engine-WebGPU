@@ -465,3 +465,79 @@ async function parseOBJ(text) {
         materialLibs,
     };
 }
+
+/**
+ * Creates a bind group for the material, texture and sampler.
+ * @param {DogMaterial} material Material to bind to.
+ * @param {DogTexture} texture Texture to bind.
+ * @param {DogSampler} sampler Sampler to bind.
+ * @param {int} shaderGroupID Group ID of the shader.
+ * @returns {int} Bind group for the material texture sampler.
+ */
+function createBGMaterialTexSamp(material, texture, sampler, shaderGroupID) {
+    const jsonMaterial = {
+        label: "Material Bind Group",
+        layout: resourceManager.getBindGroupLayout(shaderGroupID),
+        entries: [
+            {
+                binding: 0,
+                resource: { buffer: material.getBuffer().getWebGPUBuffer() }
+            },
+            {
+                binding: 1,
+                resource: texture.getWebGPUTextureView()
+            },
+            {
+                binding: 2,
+                resource: sampler.getWebGPUSampler()
+            }
+        ]
+    };
+
+    let idBindGroupMaterial = webGPUengine.createBindGroup(resourceManager.getCounter(), jsonMaterial);
+
+    return idBindGroupMaterial;
+}
+
+/**
+ * Creates a DogTexture from an array of bytes.
+ * @param {string} name The name of the texture.
+ * @param {Object} texture The texture object from glTF-Transform.
+ * @returns {DogTexture|null} The created DogTexture object.
+ */
+async function createDogTextureFromBytes(name, texture) {
+    if (!texture) {
+        return null;
+    }
+
+    const uint8Array = texture.getImage();
+    const mimeType = texture.getMimeType();
+
+    // 3. Crear Blob y decodificar la imagen de forma asíncrona
+    const blob = new Blob([uint8Array], { type: mimeType });
+    const imageBitmap = await createImageBitmap(blob); // <-- Punto clave asíncrono
+
+    // 4. Crear la textura en la GPU (Esta parte de WebGPU sí es síncrona en su creación)
+    const gpuTexture = pGraphics.device.createTexture({
+        size: [imageBitmap.width, imageBitmap.height, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+    });
+
+    // 5. Copiar los píxeles decodificados a la GPU
+    pGraphics.device.queue.copyExternalImageToTexture(
+        { source: imageBitmap },
+        { texture: gpuTexture },
+        [imageBitmap.width, imageBitmap.height]
+    );
+
+    let dogTexture = new DogTexture(name);
+    dogTexture.setWebGPUTexture(gpuTexture);
+    dogTexture.setWidthAndHeight(imageBitmap.width, imageBitmap.height);
+    dogTexture.setFormat(gpuTexture.format);
+    dogTexture.addReference();
+
+    resourceManager.add(name, dogTexture);
+
+    return dogTexture;
+}
