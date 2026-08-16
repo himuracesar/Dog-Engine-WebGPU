@@ -197,4 +197,20 @@ class DogMesh {
     setIdBuffer(idBuffer) {
         this.transform.setIdBuffer(idBuffer);
     }
+
+    /**
+     * Sets the ID of the parent of the mesh.
+     * @param {int} idParent The ID of the parent of the mesh.
+     */
+    setIdParent(idParent) {
+        this.idParent = idParent;
+    }
+
+    /**
+     * Get the ID of the parent of the mesh.
+     * @returns {int} The ID of the parent of the mesh.
+     */
+    getIdParent() {
+        return this.idParent;
+    }
 }
