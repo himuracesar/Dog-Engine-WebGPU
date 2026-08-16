@@ -1,0 +1,16 @@
+[
+    {
+        "label": "Camera",
+        "group": 0,
+        "entries": [
+            {
+                "name": "DogCamera",
+                "binding": 0,
+                "visibility": "Vertex | Fragment",
+                "buffer": {
+                    "type": "uniform"
+                }
+            }
+        ]
+    }
+]
