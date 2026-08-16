@@ -307,6 +307,7 @@
         let gouradShadingPipeline;
         let blinnPhongShadingPipeline;
         let cookTorranceShadingPipeline;
+        let flatGouradShadingPipeline;
         let wireframePipeline;
 
         let camera;
@@ -315,6 +316,7 @@
         let sphereGourad;
         let sphereBlinnPhong;
         let sphereCookTorrance;
+        let sphereFlat;
 
         let material = null;
         let directionalLight = null;
@@ -344,6 +346,7 @@
             sphereGourad = shape.createSphere(descriptor);
             sphereBlinnPhong = shape.createSphere(descriptor);
             sphereCookTorrance = shape.createSphere(descriptor);
+            sphereFlat = shape.createSphere(descriptor);
 
             descriptor = {};
             descriptor.delta = [100.0, 0.0, 100.0];
@@ -358,6 +361,7 @@
             sphereGourad.getTransform().translateAbsolute(140.0, 30.0, 0.0);
             sphereBlinnPhong.getTransform().translateAbsolute(-140.0, 30, 0.0);
             sphereCookTorrance.getTransform().translateAbsolute(0.0, 30.0, -140);
+            sphereFlat.getTransform().translateAbsolute(-140.0, 30.0, -140);
         }
 
         async function createPipeline() {
@@ -401,6 +405,14 @@
             ];
 
             cookTorranceShadingPipeline = new GeneralPipeline("cook-torrance", bglPhong, cookTorranceShaders);
+
+            let flatGouradShaders = [
+                await webGPUengine.readFileAsText("shaders/Common.wgsl"),
+                await webGPUengine.readFileAsText("shaders/LightsAndMaterial.wgsl"),
+                await webGPUengine.readFileAsText("shaders/FlatGouradShader.wgsl")
+            ];
+
+            flatPhongShadingPipeline = new GeneralPipeline("flat-phong", bglPhong, flatGouradShaders);
         }
 
         function createProps() {
@@ -710,6 +722,7 @@
             sphereGourad.update(dt);
             sphereBlinnPhong.update(dt);
             sphereCookTorrance.update(dt);
+            sphereFlat.update(dt);
             grid.update(dt);
         }
 
@@ -760,6 +773,9 @@
 
             pass.setPipeline(cookTorranceShadingPipeline.getWebGPUPipeline());
             sphereCookTorrance.render(pass);
+
+            pass.setPipeline(flatPhongShadingPipeline.getWebGPUPipeline());
+            sphereFlat.render(pass);
 
             pass.setPipeline(wireframePipeline.getWebGPUPipeline());
             pass.setBindGroup(2, propsBindGroup); // Bind group para Props
