@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Particle Systems (Explosion & Fountain)</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0b0e;
+            font-family: sans-serif;
+            color: #fff;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(15, 15, 20, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+            max-width: 320px;
+        }
+
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #61dafb;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 3px;
+            color: #ccc;
+        }
+
+        select,
+        input[type="range"] {
+            width: 100%;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .value-display {
+            font-family: monospace;
+            color: #61dafb;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui">
+        <h2>Particle Controls (WebGPU)</h2>
+        <div class="control-group">
+            <label>Effect Type:</label>
+            <select id="effectType">
+                <option value="0">Explosion</option>
+                <option value="1" selected>Fountain</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Lifespan: <span id="valLifespan" class="value-display">2.5</span>s</label>
+            <input type="range" id="paramLifespan" min="0.5" max="5.0" step="0.1" value="2.5">
+        </div>
+        <div class="control-group">
+            <label>Speed: <span id="valSpeed" class="value-display">4.0</span></label>
+            <input type="range" id="paramSpeed" min="0.5" max="15.0" step="0.5" value="4.0">
+        </div>
+        <div class="control-group">
+            <label>Size: <span id="valSize" class="value-display">0.12</span></label>
+            <input type="range" id="paramSize" min="0.02" max="0.3" value="0.12" step="0.01">
+        </div>
+        <div class="control-group">
+            <label>Texture Style:</label>
+            <select id="paramTexture">
+                <option value="0">Soft Glow Circle</option>
+                <option value="1">Sharp Star / Spark</option>
+                <option value="2">Ring Wave</option>
+            </select>
+        </div>
+    </div>
+
+    <canvas id="webgpuCanvas"></canvas>
+
+    <script type="module">
+        // --- WebGPU Particle System Demo ---
+        // Pure WebGPU implementation with Compute Shaders for particle physics & lifecycle,
+        // and Render Shaders for billboarding instanced points/quads.
+
+        async function init() {
+            if (!navigator.gpu) {
+                alert("WebGPU is not supported in your browser. Ensure chrome://flags or appropriate flags are enabled.");
+                return;
+            }
+
+            const canvas = document.getElementById('webgpuCanvas');
+            const adapter = await navigator.gpu.requestAdapter();
+            const device = await adapter.requestDevice();
+            const context = canvas.getContext('webgpu');
+
+            const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+            context.configure({
+                device: device,
+                format: presentationFormat,
+                alphaMode: 'premultiplied'
+            });
+
+            // Handle canvas resize dynamically
+            function resizeCanvas() {
+                const width = window.innerWidth * window.devicePixelRatio;
+                const height = window.innerHeight * window.devicePixelRatio;
+                if (canvas.width !== width || canvas.height !== height) {
+                    canvas.width = width;
+                    canvas.height = height;
+                }
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // --- Particle Constants & Buffers Configuration ---
+            const MAX_PARTICLES = 20000;
+
+            // Particle struct layout in storage buffer:
+            // vec3 position; float life;
+            // vec3 velocity; float maxLife;
+            // vec4 color;
+            // float size; float type; vec2 pad;
+            const PARTICLE_STRIDE = 12 * 4; // 48 bytes per particle
+
+            // Initialize particle initial data CPU-side
+            const initialData = new Float32Array(MAX_PARTICLES * (PARTICLE_STRIDE / 4));
+            for (let i = 0; i < MAX_PARTICLES; i++) {
+                const offset = i * (PARTICLE_STRIDE / 4);
+                initialData[offset + 0] = 0.0;  // pos.x
+                initialData[offset + 1] = -10.0; // pos.y (dead off-screen initially)
+                initialData[offset + 2] = 0.0;  // pos.z
+                initialData[offset + 3] = -1.0; // life (expired)
+                initialData[offset + 4] = 0.0;  // vel.x
+                initialData[offset + 5] = 0.0;  // vel.y
+                initialData[offset + 6] = 0.0;  // vel.z
+                initialData[offset + 7] = 1.0;  // maxLife
+                initialData[offset + 8] = 1.0;  // color.r
+                initialData[offset + 9] = 0.6;  // color.g
+                initialData[offset + 10] = 0.2; // color.b
+                initialData[offset + 11] = 1.0; // color.a
+                initialData[offset + 12] = 0.1; // size
+                initialData[offset + 13] = 0.0; // type/extras
+                initialData[offset + 14] = 0.0;
+                initialData[offset + 15] = 0.0;
+            }
+
+            // Create two storage buffers for ping-pong compute updates if needed, 
+            // or a single buffer updated in-place since particles manage their own dead/alive state.
+            const particleBuffer = device.createBuffer({
+                size: initialData.byteLength,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX,
+                mappedAtCreation: true
+            });
+            new Float32Array(particleBuffer.getMappedRange()).set(initialData);
+            particleBuffer.unmap();
+
+            // Uniform buffer for simulation & camera parameters
+            // struct Uniforms {
+            //   mat4 viewProj;
+            //   vec4 timeParams; // x: deltaTime, y: totalTime, z: effectType, w: unused
+            //   vec4 emitterParams; // x: lifespan, y: speed, z: size, w: textureType
+            // };
+            const uniformBufferSize = (16 + 4 + 4) * 4; // 24 floats = 96 bytes
+            const uniformBuffer = device.createBuffer({
+                size: uniformBufferSize,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+            });
+
+            // Quad vertex geometry for rendering billboards (2 triangles forming a quad)
+            const quadVertices = new Float32Array([
+                -0.5, -0.5,
+                0.5, -0.5,
+                -0.5, 0.5,
+                -0.5, 0.5,
+                0.5, -0.5,
+                0.5, 0.5,
+            ]);
+            const quadVertexBuffer = device.createBuffer({
+                size: quadVertices.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+                mappedAtCreation: true
+            });
+            new Float32Array(quadVertexBuffer.getMappedRange()).set(quadVertices);
+            quadVertexBuffer.unmap();
+
+            // --- Generate Procedural Textures ---
+            function createTexture(type) {
+                const size = 128;
+                const canvas2d = document.createElement('canvas');
+                canvas2d.width = size;
+                canvas2d.height = size;
+                const ctx = canvas2d.getContext('2d');
+                ctx.clearRect(0, 0, size, size);
+
+                const cx = size / 2;
+                const cy = size / 2;
+
+                if (type === 0) {
+                    // Soft Glow Circle
+                    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+                    grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+                    grad.addColorStop(0.3, 'rgba(255, 200, 100, 0.8)');
+                    grad.addColorStop(0.7, 'rgba(255, 80, 20, 0.3)');
+                    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, size, size);
+                } else if (type === 1) {
+                    // Sharp Star / Spark
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i * Math.PI) / 2;
+                        const outerX = cx + Math.cos(angle) * (cx * 0.9);
+                        const outerY = cy + Math.sin(angle) * (cy * 0.9);
+                        const innerX = cx + Math.cos(angle + Math.PI / 4) * (cx * 0.25);
+                        const innerY = cy + Math.sin(angle + Math.PI / 4) * (cy * 0.25);
+                        if (i === 0) ctx.moveTo(outerX, outerY);
+                        else ctx.lineTo(outerX, outerY);
+                        ctx.lineTo(innerX, innerY);
+                    }
+                    ctx.closePath();
+                    ctx.shadowColor = 'rgba(255, 150, 50, 0.9)';
+                    ctx.shadowBlur = 15;
+                    ctx.fill();
+                } else {
+                    // Ring Wave
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.lineWidth = 12;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, cx * 0.55, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.shadowColor = 'rgba(100, 200, 255, 0.8)';
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                }
+
+                const imgData = ctx.getImageData(0, 0, size, size);
+                const texture = device.createTexture({
+                    size: [size, size, 1],
+                    format: 'rgba8unorm',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+                });
+                device.queue.writeTexture(
+                    { texture: texture },
+                    imgData.data,
+                    { bytesPerRow: size * 4, rowsPerImage: size },
+                    [size, size, 1]
+                );
+                return texture;
+            }
+
+            const textures = [createTexture(0), createTexture(1), createTexture(2)];
+            const sampler = device.createSampler({
+                magFilter: 'linear',
+                minFilter: 'linear',
+            });
+
+            // --- WGSL Shaders ---
+            const computeShaderCode = `
+                struct Particle {
+                    position: vec3<f32>,
+                    life: f32,
+                    velocity: vec3<f32>,
+                    maxLife: f32,
+                    color: vec4<f32>,
+                    size: f32,
+                    type: f32,
+                    pad1: f32,
+                    pad2: f32,
+                };
+
+                struct Uniforms {
+                    viewProj: mat4x4<f32>,
+                    timeParams: vec4<f32>, // x: dt, y: time, z: effectType, w: unused
+                    emitterParams: vec4<f32>, // x: lifespan, y: speed, z: size, w: textureType
+                };
+
+                @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
+                @group(0) @binding(1) var<uniform> uniforms: Uniforms;
+
+                // Pseudo-random number generator based on hash
+                fn hash(seed: u32) -> u32 {
+                    var state = seed;
+                    state = state ^ 2747636419u;
+                    state = state * 2654435769u;
+                    state = state ^ (state >> 16u);
+                    state = state * 2654435769u;
+                    state = state ^ (state >> 16u);
+                    return state;
+                }
+
+                fn randomFloat(seed: u32) -> f32 {
+                    return f32(hash(seed)) / 4294967295.0;
+                }
+
+                @compute @workgroup_size(64)
+                fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+                    let index = global_id.x;
+                    if (index >= arrayLength(&particles)) {
+                        return;
+                    }
+
+                    var p = particles[index];
+                    let dt = uniforms.timeParams.x;
+                    let time = uniforms.timeParams.y;
+                    let effectType = uniforms.timeParams.z; // 0.0: Explosion, 1.0: Fountain
+                    let lifespan = uniforms.emitterParams.x;
+                    let speed = uniforms.emitterParams.y;
+                    let baseSize = uniforms.emitterParams.z;
+
+                    p.life -= dt;
+
+                    // Revive or update particle
+                    if (p.life <= 0.0) {
+                        let seed = index + u32(time * 1000.0);
+                        let r1 = randomFloat(seed + 1u);
+                        let r2 = randomFloat(seed + 2u);
+                        let r3 = randomFloat(seed + 3u);
+                        let r4 = randomFloat(seed + 4u);
+
+                        if (effectType < 0.5) {
+                            // --- EXPLOSION EFFECT ---
+                            p.position = vec3<f32>(0.0, 0.0, 0.0);
+                            let theta = r1 * 6.2831853; // azimuth
+                            let phi = (r2 - 0.5) * 3.1415926; // elevation
+                            let spd = speed * (0.5 + 0.5 * r3);
+                            p.velocity = vec3<f32>(
+                                cos(phi) * cos(theta) * spd,
+                                sin(phi) * spd,
+                                cos(phi) * sin(theta) * spd
+                            );
+                            p.maxLife = lifespan * (0.6 + 0.8 * r4);
+                            p.life = p.maxLife;
+                            p.color = vec4<f32>(1.0, 0.5 + 0.5 * r3, 0.1 + 0.4 * r4, 1.0);
+                            p.size = baseSize * (0.8 + 0.6 * r4);
+                        } else {
+                            // --- FOUNTAIN EFFECT ---
+                            p.position = vec3<f32>((r1 - 0.5) * 0.4, -2.0, (r2 - 0.5) * 0.4);
+                            let angle = r3 * 6.2831853;
+                            let spread = 0.25;
+                            let spd = speed * (0.7 + 0.6 * r4);
+                            p.velocity = vec3<f32>(
+                                cos(angle) * spread * spd,
+                                (1.2 + 0.5 * r4) * spd,
+                                sin(angle) * spread * spd
+                            );
+                            p.maxLife = lifespan * (0.7 + 0.6 * r1);
+                            p.life = p.maxLife;
+                            // Cool blue/cyan/purple gradient for fountain
+                            p.color = vec4<f32>(0.2 + 0.3 * r2, 0.6 + 0.4 * r3, 1.0, 1.0);
+                            p.size = baseSize * (0.7 + 0.6 * r2);
+                        }
+                    } else {
+                        // Apply physics update
+                        if (effectType < 0.5) {
+                            // Explosion gravity and drag
+                            p.velocity.y -= 3.5 * dt;
+                            p.velocity *= (1.0 - 1.2 * dt);
+                        } else {
+                            // Fountain gravity
+                            p.velocity.y -= 5.8 * dt;
+                        }
+                        p.position += p.velocity * dt;
+
+                        // Fade out alpha near end of life
+                        let lifeRatio = p.life / p.maxLife;
+                        p.color.a = smoothstep(0.0, 0.2, lifeRatio);
+                    }
+
+                    particles[index] = p;
+                }
+            `;
+
+            const renderShaderCode = `
+                struct Particle {
+                    position: vec3<f32>,
+                    life: f32,
+                    velocity: vec3<f32>,
+                    maxLife: f32,
+                    color: vec4<f32>,
+                    size: f32,
+                    type: f32,
+                    pad1: f32,
+                    pad2: f32,
+                };
+
+                struct Uniforms {
+                    viewProj: mat4x4<f32>,
+                    timeParams: vec4<f32>,
+                    emitterParams: vec4<f32>,
+                };
+
+                @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+                @group(0) @binding(1) var particleTexture: texture_2d<f32>;
+                @group(0) @binding(2) var textureSampler: sampler;
+
+                struct VertexInput {
+                    @location(0) quadPos: vec2<f32>,
+                    @builtin(instance_index) instanceIndex: u32,
+                };
+
+                struct VertexOutput {
+                    @builtin(position) position: vec4<f32>,
+                    @location(0) uv: vec2<f32>,
+                    @location(1) color: vec4<f32>,
+                };
+
+                @group(0) @binding(3) var<storage, read> particles: array<Particle>;
+
+                @vertex
+                fn vsMain(input: VertexInput) -> VertexOutput {
+                    let p = particles[input.instanceIndex];
+                    var output: VertexOutput;
+
+                    if (p.life <= 0.0) {
+                        output.position = vec4<f32>(0.0, 0.0, -1000.0, 1.0);
+                        return output;
+                    }
+
+                    // Billboard calculation: camera right and up vectors extracted/approximated from viewProj matrix
+                    let camRight = vec3<f32>(uniforms.viewProj[0][0], uniforms.viewProj[1][0], uniforms.viewProj[2][0]);
+                    let camUp = vec3<f32>(uniforms.viewProj[0][1], uniforms.viewProj[1][1], uniforms.viewProj[2][1]);
+
+                    let worldPos = p.position 
+                                 + camRight * input.quadPos.x * p.size 
+                                 + camUp * input.quadPos.y * p.size;
+
+                    output.position = uniforms.viewProj * vec4<f32>(worldPos, 1.0);
+                    output.uv = input.quadPos + vec2<f32>(0.5, 0.5);
+                    output.color = p.color;
+                    return output;
+                }
+
+                @fragment
+                fn fsMain(input: VertexOutput) -> @location(0) vec4<f32> {
+                    let texColor = textureSample(particleTexture, textureSampler, input.uv);
+                    let finalColor = input.color * texColor;
+                    if (finalColor.a < 0.01) {
+                        discard;
+                    }
+                    return finalColor;
+                }
+            `;
+
+            // Compile Shaders
+            const computeModule = device.createShaderModule({ code: computeShaderCode });
+            const renderModule = device.createShaderModule({ code: renderShaderCode });
+
+            // --- Pipelines Setup ---
+            // 1. Compute Pipeline
+            const computePipeline = device.createComputePipeline({
+                layout: 'auto',
+                compute: {
+                    module: computeModule,
+                    entryPoint: 'main',
+                }
+            });
+
+            // Bind Group Layouts
+            const computeBindGroupLayout = computePipeline.getBindGroupLayout(0);
+            const computeBindGroup = device.createBindGroup({
+                layout: computeBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: { buffer: particleBuffer } },
+                    { binding: 1, resource: { buffer: uniformBuffer } }
+                ]
+            });
+
+            // Render Pipeline Layout & Pipeline
+            const renderPipelineLayout = device.createPipelineLayout({
+                bindGroupLayouts: [device.createBindGroupLayout({
+                    entries: [
+                        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+                        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+                        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                        { binding: 3, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } }
+                    ]
+                })]
+            });
+
+            const renderPipeline = device.createRenderPipeline({
+                layout: renderPipelineLayout,
+                vertex: {
+                    module: renderModule,
+                    entryPoint: 'vsMain',
+                    buffers: [
+                        {
+                            arrayStride: 2 * 4,
+                            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }]
+                        }
+                    ]
+                },
+                fragment: {
+                    module: renderModule,
+                    entryPoint: 'fsMain',
+                    targets: [{
+                        format: presentationFormat,
+                        blend: {
+                            color: {
+                                srcFactor: 'src-alpha',
+                                dstFactor: 'one', // Additive blending for gorgeous glowing particles
+                                operation: 'add'
+                            },
+                            alpha: {
+                                srcFactor: 'one',
+                                dstFactor: 'one',
+                                operation: 'add'
+                            }
+                        }
+                    }]
+                },
+                primitive: {
+                    topology: 'triangle-list',
+                },
+                depthStencil: {
+                    format: 'depth24plus',
+                    depthWriteEnabled: false,
+                    depthCompare: 'less-equal'
+                }
+            });
+
+            const renderBindGroupSetting = (texIndex) => device.createBindGroup({
+                layout: renderPipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: { buffer: uniformBuffer } },
+                    { binding: 1, resource: textures[texIndex].createView() },
+                    { binding: 2, resource: sampler },
+                    { binding: 3, resource: { buffer: particleBuffer } }
+                ]
+            });
+
+            let currentBindGroup = renderBindGroupSetting(1);
+
+            // Create Depth Texture for RenderPass
+            let depthTexture = device.createTexture({
+                size: [canvas.width, canvas.height, 1],
+                format: 'depth24plus',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT
+            });
+
+            // --- UI Interaction State ---
+            const uiState = {
+                effectType: 1,   // 0: Explosion, 1: Fountain
+                lifespan: 2.5,
+                speed: 4.0,
+                size: 0.12,
+                textureIdx: 1
+            };
+
+            document.getElementById('effectType').addEventListener('input', (e) => {
+                uiState.effectType = parseInt(e.target.value);
+            });
+            document.getElementById('paramLifespan').addEventListener('input', (e) => {
+                uiState.lifespan = parseFloat(e.target.value);
+                document.getElementById('valLifespan').innerText = uiState.lifespan.toFixed(1);
+            });
+            document.getElementById('paramSpeed').addEventListener('input', (e) => {
+                uiState.speed = parseFloat(e.target.value);
+                document.getElementById('valSpeed').innerText = uiState.speed.toFixed(1);
+            });
+            document.getElementById('paramSize').addEventListener('input', (e) => {
+                uiState.size = parseFloat(e.target.value);
+                document.getElementById('valSize').innerText = uiState.size.toFixed(2);
+            });
+            document.getElementById('paramTexture').addEventListener('input', (e) => {
+                uiState.textureIdx = parseInt(e.target.value);
+                currentBindGroup = renderBindGroupSetting(uiState.textureIdx);
+            });
+
+            // --- Matrix Math Helpers ---
+            function createPerspectiveMatrix(fov, aspect, near, far) {
+                const f = 1.0 / Math.tan(fov / 2);
+                const out = new Float32Array(16);
+                out[0] = f / aspect;
+                out[5] = f;
+                out[10] = far / (near - far);
+                out[11] = -1.0;
+                out[14] = (near * far) / (near - far);
+                return out;
+            }
+
+            function multiplyMatrices(a, b) {
+                const out = new Float32Array(16);
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        out[j * 4 + i] =
+                            a[0 * 4 + i] * b[j * 4 + 0] +
+                            a[1 * 4 + i] * b[j * 4 + 1] +
+                            a[2 * 4 + i] * b[j * 4 + 2] +
+                            a[3 * 4 + i] * b[j * 4 + 3];
+                    }
+                }
+                return out;
+            }
+
+            function createTranslationMatrix(x, y, z) {
+                const out = new Float32Array(16);
+                out[0] = 1; out[5] = 1; out[10] = 1; out[15] = 1;
+                out[12] = x; out[13] = y; out[14] = z;
+                return out;
+            }
+
+            function createRotationXMatrix(angle) {
+                const c = Math.cos(angle), s = Math.sin(angle);
+                const out = new Float32Array(16);
+                out[0] = 1; out[5] = c; out[6] = s; out[9] = -s; out[10] = c; out[15] = 1;
+                return out;
+            }
+
+            function createRotationYMatrix(angle) {
+                const c = Math.cos(angle), s = Math.sin(angle);
+                const out = new Float32Array(16);
+                out[0] = c; out[2] = -s; out[5] = 1; out[8] = s; out[10] = c; out[15] = 1;
+                return out;
+            }
+
+            // --- Main Render & Simulation Loop ---
+            let lastTime = performance.now();
+            let totalTime = 0;
+
+            function frame(currentTime) {
+                const deltaTime = Math.min((currentTime - lastTime) * 0.001, 0.05);
+                lastTime = currentTime;
+                totalTime += deltaTime;
+
+                resizeCanvas();
+                if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
+                    depthTexture.destroy();
+                    depthTexture = device.createTexture({
+                        size: [canvas.width, canvas.height, 1],
+                        format: 'depth24plus',
+                        usage: GPUTextureUsage.RENDER_ATTACHMENT
+                    });
+                }
+
+                // Camera orbit setup
+                const radius = 10.0;
+                const camAngle = totalTime * 0.3;
+                const eyeX = Math.sin(camAngle) * radius;
+                const eyeZ = Math.cos(camAngle) * radius;
+                const eyeY = 2.0 + Math.sin(totalTime * 0.2) * 1.5;
+
+                // Simple LookAt & Projection View Matrix construction
+                const aspect = canvas.width / canvas.height;
+                const proj = createPerspectiveMatrix(Math.PI / 4, aspect, 0.1, 100.0);
+
+                // View matrix components (orbiting around origin)
+                const viewRotY = createRotationYMatrix(-camAngle);
+                const viewRotX = createRotationXMatrix(0.2);
+                const viewTrans = createTranslationMatrix(-eyeX, -eyeY, -eyeZ);
+                const view = multiplyMatrices(viewRotX, multiplyMatrices(viewRotY, viewTrans));
+                const viewProj = multiplyMatrices(proj, view);
+
+                // Update Uniform Buffer Data
+                const uniformData = new Float32Array(uniformBufferSize / 4);
+                uniformData.set(viewProj, 0); // 16 floats
+                uniformData[16] = deltaTime;
+                uniformData[17] = totalTime;
+                uniformData[18] = uiState.effectType;
+                uniformData[19] = 0.0;
+                uniformData[20] = uiState.lifespan;
+                uniformData[21] = uiState.speed;
+                uniformData[22] = uiState.size;
+                uniformData[23] = uiState.textureIdx;
+
+                device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+                // --- Command Encoder Execution ---
+                const commandEncoder = device.createCommandEncoder();
+
+                // 1. Dispatch Compute Shader for Particle Physics & Spawning
+                const computePass = commandEncoder.beginComputePass();
+                computePass.setPipeline(computePipeline);
+                computePass.setBindGroup(0, computeBindGroup);
+                const workgroupCount = Math.ceil(MAX_PARTICLES / 64);
+                computePass.dispatchWorkgroups(workgroupCount);
+                computePass.end();
+
+                // 2. Render Pass for Particle Billboards
+                const passEncoder = commandEncoder.beginRenderPass({
+                    colorAttachments: [{
+                        view: context.getCurrentTexture().createView(),
+                        clearValue: { r: 0.04, g: 0.04, b: 0.06, a: 1.0 },
+                        loadOp: 'clear',
+                        storeOp: 'store'
+                    }],
+                    depthStencilAttachment: {
+                        view: depthTexture.createView(),
+                        depthClearValue: 1.0,
+                        depthLoadOp: 'clear',
+                        depthStoreOp: 'store'
+                    }
+                });
+
+                passEncoder.setPipeline(renderPipeline);
+                passEncoder.setBindGroup(0, currentBindGroup);
+                passEncoder.setVertexBuffer(0, quadVertexBuffer);
+                passEncoder.draw(6, MAX_PARTICLES, 0, 0);
+                passEncoder.end();
+
+                device.queue.submit([commandEncoder.finish()]);
+                requestAnimationFrame(frame);
+            }
+
+            requestAnimationFrame(frame);
+        }
+
+        init().catch(err => {
+            console.error(err);
+            alert("Error initializing WebGPU demo: " + err.message);
+        });
+    </script>
+</body>
+
+</html>
