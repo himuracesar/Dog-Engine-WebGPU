@@ -19,54 +19,6 @@ class DogPipeline {
     }
 
     /**
-     * Create a vertex buffer layout based on the provided vertex layout definition.
-     * @param {GPUVertexBufferLayout} vertexLayout Layout definition for the vertex buffer, 
-     * where each key is an attribute name and value is an object with a 'size' property indicating 
-     * the number of components (e.g., { position: { size: 3 }, color: { size: 4 } }).
-     * @returns {GPUVertexBufferLayout} Vertex buffer layout compatible with WebGPU pipeline creation.
-     */
-    /*createVertexBufferLayout(vertexLayout) {
-        var attributes = [];
-        var offset = 0;
-        var location = 0;
-        var stride = 0;
-
-        for (const [key, value] of Object.entries(vertexLayout)) {
-            //console.log(`${key}: ${value}`);
-            attributes.push({
-                format: "float32x" + value,
-                offset: offset,
-                shaderLocation: location
-            });
-
-            location++;
-            offset += value * 4; // offset in bytes (value * 4 bytes per float)
-            stride += value;
-        }
-
-        const vertexBufferLayout = {
-            arrayStride: stride * 4, // stride * 4 bytes per float
-            attributes: attributes,
-        };
-
-        return vertexBufferLayout;
-    }*/
-
-    /**
-     * Create a shader module from the provided shader source code.
-     * @param {string} shaderSource Source of vextex and fragment shaders in WGSL.
-     * @returns {GPUShaderModule} Shader module created from the provided source code.
-     */
-    /*createShaderModule(shaderSource) {
-        const shaderModule = pGraphics.device.createShaderModule({
-            label: this.name + ' Shader',
-            code: shaderSource
-        });
-
-        return shaderModule;
-    }*/
-
-    /**
      * Create a render pipeline using the shader module and vertex buffer layout defined in the constructor.
      * If the bindGroupLayouts parameter is provided and not empty, it will be used to create a custom pipeline layout;
      * otherwise, the pipeline layout will be set to "auto", allowing WebGPU to infer it from the shader code.
@@ -74,15 +26,6 @@ class DogPipeline {
      * @returns {GPURenderPipeline} Render pipeline created based on the shader module and vertex buffer layout.
      */
     createPipeline(bindGroupLayouts, pipelineDescriptor) {
-        /*var layout = "auto";
-
-        if (bindGroupLayouts.length > 0 && bindGroupLayouts[0] != 'auto') {
-            layout = pGraphics.device.createPipelineLayout({
-                label: this.name + " Pipeline Layout",
-                bindGroupLayouts: bindGroupLayouts
-            });
-        }*/
-
         const layout = webGPUengine.createPipelineLayout(this.name, bindGroupLayouts);
 
         let gpuPipeline = null;
