@@ -498,7 +498,7 @@ const GPUVisibility = Object.freeze({
         material.setTransparency(1.0);
         material.setOpticalDensity(0.0)
         material.setRoughness(0.5)
-        material.setMetallness(0.5)
+        material.setMetallic(0.5)
         material.setHasTexture(false)
         material.setFresnel(0.0)
         material.addReference();
@@ -621,7 +621,7 @@ const GPUVisibility = Object.freeze({
             material.setDiffuseTextureIndex(texture.getName());
             material.setHasTexture(true);
 
-            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear' });
+            let sampler = createDogSampler(null, { magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' });
             texture.setIdSampler(sampler.getName());
 
             const jsonMaterial = {

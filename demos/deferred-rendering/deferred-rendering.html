@@ -188,6 +188,9 @@
     <script type="text/javascript" src="/src/DogEngine/pipeline/WireframePipeline.js"></script>
 
     <script type="text/javascript" src="js/Scene01.js"></script>
+    <script type="text/javascript" src="js/SponzaScene.js"></script>
+    <script type="text/javascript" src="pipeline/GBuffersPipeline.js"></script>
+    <script type="text/javascript" src="pipeline/DeferredRenderingPipeline.js"></script>
 </head>
 
 <body onload="init();">
@@ -217,85 +220,6 @@
         //***************************************************
         let scene;
 
-        let wireframePipeline;
-
-        let camera;
-
-        let bindGroupLayouts;
-
-        let depthTexture;
-
-        let propsBindGroup;
-        let propsBindGroupLayout;
-
-        //------------------- Demo's main functions -------------------
-        function createShapes() {
-            const shape = new DogShape();
-
-            let descriptor = {};
-            descriptor.delta = [100.0, 0.0, 100.0];
-            descriptor.numVertRows = 50;
-            descriptor.numVertCols = 50;
-            descriptor.position = [0.0, 0.0, 0.0];
-            descriptor.texScale = 1.0;
-
-            grid = shape.createGrid(descriptor);
-        }
-
-        async function createPipeline() {
-            const bglWireframe = [
-                resourceManager.getBindGroupLayout(0),
-                undefined,
-                propsBindGroupLayout,
-                resourceManager.getBindGroupLayout(3),
-            ];
-
-            wireframePipeline = new WireframePipeline(bglWireframe);
-
-            depthTexture = pGraphics.device.createTexture({
-                size: [canvas.width, canvas.height],
-                format: 'depth24plus',
-                usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            });
-        }
-
-        function createProps() {
-            propsBindGroupLayout = pGraphics.device.createBindGroupLayout({
-                entries: [{
-                    binding: 0,                           // Same index as in the bindGroup
-                    visibility: GPUShaderStage.FRAGMENT,    // In which stages is visible
-                    buffer: {
-                        type: "uniform"                     // uniform buffer (default)
-                    }
-                }]
-            });
-
-            let propsData = new Float32Array([1.0, 1.0, 0.0, 1.0]); // Color amarillo
-            let propsBuffer = pGraphics.device.createBuffer({
-                size: propsData.byteLength,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-            pGraphics.device.queue.writeBuffer(propsBuffer, 0, propsData.buffer);
-
-            propsBindGroup = pGraphics.device.createBindGroup({
-                layout: propsBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: {
-                            buffer: propsBuffer,
-                        },
-                    },
-                ],
-            });
-        }
-
-        function createLightsMaterials() {
-            window.dispatchEvent(new CustomEvent(EVT_INIT, {}));
-        }
-
-        //------------------ End demo's main functons -----------------
-
         /**
          * Initializes WebGPU, sets up event listeners for input, and starts the render loop.
          */
@@ -310,20 +234,8 @@
             canvas.onmousedown = event => this.onMouseDown(event);
             canvas.onmousemove = event => this.onMouseMove(event);
 
-            let configScene = await webGPUengine.readFileAsJson("config/camera-null-null-mesh.json");
-
-            webGPUengine.createBindGroupLayouts(configScene);
-
-            camera = new DogCamera();
-            camera.setPosition([0.0, 0.0, 100.0]);
-            camera.setSpeed(2.3);
-            camera.setFarPlane(4000.0);
-
-            createShapes();
-            createProps();
-            await createPipeline();
-
-            scene = new Scene01();
+            //scene = new Scene01();
+            scene = new SponzaScene();
             await scene.init();
 
             const overlay = document.getElementById('loading-overlay');
@@ -338,8 +250,7 @@
          * @param {MouseEvent} event 
          */
         function onMouseUp(event) {
-            this.dragging = false;
-            mouse.down = false;
+            scene.onMouseUp(event);
         }
 
         /**
@@ -347,19 +258,7 @@
          * @param {MouseEvent} event 
          */
         function onMouseDown(event) {
-            this.dragging = true;
-            let x = event.clientX; // x coordinate of a mouse pointer
-            let y = event.clientY; // y coordinate of a mouse pointer
-            let rect = event.target.getBoundingClientRect();
-
-            //console.log("Mouse down at: " + x + ", " + y);
-            mouse.down = true;
-            mouse.x = x;
-            mouse.y = y;
-
-            //x = ((x - rect.left) - canvas.width / 2) / (canvas.width / 2);
-            //y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2);
-            console.log("Mouse down at: " + x + ", " + y);
+            scene.onMouseDown(event);
         }
 
         /**
@@ -367,45 +266,45 @@
          * @param {MouseEvent} event 
          */
         function onMouseMove(event) {
-            this.lastX = this.x;
-            this.lastY = this.y;
-
-            this.x = event.clientX;
-            this.y = event.clientY;
-
-            mouse.x = this.x;
-            mouse.y = this.y;
-
-            if (!this.dragging)
-                return;
-
-            const dx = this.x - this.lastX;
-            const dy = this.y - this.lastY;
-
-            camera.yaw(dx * camera.getSpeedRotation());
-            camera.pitch(dy * camera.getSpeedRotation());
+            scene.onMouseMove(event);
         }
 
         /**
          * Handles input events.
          */
         function input() {
-            if (keypress[KeyCode.W])
-                camera.moveForward(1);
-            if (keypress[KeyCode.S])
-                camera.moveForward(-1);
-            if (keypress[KeyCode.A])
-                camera.strafe(-1);
-            if (keypress[KeyCode.D])
-                camera.strafe(1);
-            if (keypress[KeyCode.Left])
-                camera.yaw(0.01);
-            if (keypress[KeyCode.Right])
-                camera.yaw(-0.01);
-            if (keypress[KeyCode.Up])
-                camera.pitch(0.01);
-            if (keypress[KeyCode.Down])
-                camera.pitch(-0.01);
+            scene.input();
+        }
+
+        /**
+         * Release click and stop dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseUp(event) {
+            scene.onMouseUp(event);
+        }
+
+        /**
+         * Click and start dragging.
+         * @param {MouseEvent} event 
+         */
+        function onMouseDown(event) {
+            scene.onMouseDown(event);
+        }
+
+        /**
+         * If dragging, calculates the difference in mouse position and rotates the camera.
+         * @param {MouseEvent} event 
+         */
+        function onMouseMove(event) {
+            scene.onMouseMove(event);
+        }
+
+        /**
+         * Handles input events.
+         */
+        function input() {
+            scene.input();
         }
 
         //------------- End Input -------------
@@ -421,8 +320,6 @@
 
             input();
 
-            grid.update(dt);
-
             scene.update(dt);
         }
 
@@ -430,40 +327,6 @@
          * Renders a frame by encoding commands to clear the screen and submit them to the GPU.
          */
         function render() {
-            // Rendering logic goes here (e.g., issuing draw calls)
-            /*const encoder = pGraphics.device.createCommandEncoder();
-            const pass = encoder.beginRenderPass({
-                colorAttachments: [{
-                    view: pGraphics.context.getCurrentTexture().createView(),
-                    loadOp: "clear",
-                    clearValue: { r: configState.background.r, g: configState.background.g, b: configState.background.b, a: configState.background.a },
-                    storeOp: "store",
-                }],
-
-                depthStencilAttachment: {
-                    view: depthTexture.createView(),
-                    depthClearValue: 1.0, // 1.0 is the farthest point
-                    depthLoadOp: 'clear',
-                    depthStoreOp: 'store',
-                }
-            });
-
-            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 0, camera.getViewMatrix());
-            pGraphics.device.queue.writeBuffer(camera.getBuffer().getWebGPUBuffer(), 16 * 4, camera.getProjectionMatrix());
-
-            pass.setBindGroup(camera.getGroup(), camera.getBindGroup());
-            pass.setPipeline(wireframePipeline.getWebGPUPipeline());
-            pass.setBindGroup(2, propsBindGroup); // Bind group para Props
-            grid.render(pass);
-
-            pass.end();
-
-            const commandBuffer = encoder.finish();
-
-            // Finish the command buffer and immediately submit it.
-            pGraphics.device.queue.submit([commandBuffer]);*/
-            //console.log("Frame rendered");
-
             scene.render();
         }
 

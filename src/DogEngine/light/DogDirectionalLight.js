@@ -26,12 +26,12 @@ class DogDirectionalLight {
             this.idBuffer = webGPUengine.createDogBuffer("DogDirectionalLight" + idCount, BufferType.Data, null, bufferSize, true);
         }
 
-        const jsonObj = resourceManager.getGroupAndBinding("DogDirectionalLight");
-        this.group = jsonObj.group;
-        this.binding = jsonObj.binding;
-
         if (createBindGroup) {
             const bindGroupLayout = resourceManager.getBindGroupLayout(this.group);
+
+            const jsonObj = resourceManager.getGroupAndBinding("DogDirectionalLight");
+            this.group = jsonObj.group;
+            this.binding = jsonObj.binding;
 
             const objLayout = {
                 label: "Directional Light Bind Group",

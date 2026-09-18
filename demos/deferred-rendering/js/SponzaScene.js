@@ -1,10 +1,10 @@
 /**
- * Scene 1 for deferred rendering demo.
+ * Sponza scene for deferred rendering demo.
  * 
  * @version 1.0
  * @author César Himura
  */
-class Scene01 extends DogScene {
+class SponzaScene extends DogScene {
     constructor() {
         super();
 
@@ -26,10 +26,7 @@ class Scene01 extends DogScene {
         this.propsBuffer;
 
         //meshes
-        this.grid;
-        this.floor;
-        this.cube;
-        this.sphere;
+        this.sponza;
 
         this.gBuffersPipeline;
         this.gBuffersDescriptor;
@@ -54,10 +51,10 @@ class Scene01 extends DogScene {
 
         this.camera = new DogCamera();
         this.camera.setPosition([0.0, 0.0, 100.0]);
-        this.camera.setSpeed(2.3);
+        this.camera.setSpeed(4.3);
         this.camera.setFarPlane(4000.0);
 
-        this.createShapes();
+        await this.createShapes();
         this.createProps();
         this.createRenderTargets();
         this.createGBufferBindGroup();
@@ -109,10 +106,7 @@ class Scene01 extends DogScene {
      * @param {float} deltaTime The time elapsed since the last update.
      */
     update(deltaTime) {
-        this.grid.update(deltaTime);
-        this.floor.update(deltaTime);
-        this.cube.update(deltaTime);
-        this.sphere.update(deltaTime);
+        this.sponza.update(deltaTime);
 
         this.directionalLight.setDirection([this.directionalLightState.direction.x, this.directionalLightState.direction.y, this.directionalLightState.direction.z, 0.0]);
         this.directionalLight.setColor([this.directionalLightState.color.r, this.directionalLightState.color.g, this.directionalLightState.color.b, this.directionalLightState.color.a]);
@@ -137,9 +131,7 @@ class Scene01 extends DogScene {
             gBufferPass.setPipeline(this.gBuffersPipeline.getWebGPUPipeline());
             gBufferPass.setBindGroup(0, this.camera.getBindGroup());
 
-            this.floor.render(gBufferPass);
-            this.cube.render(gBufferPass);
-            this.sphere.render(gBufferPass);
+            this.sponza.render(gBufferPass);
 
             gBufferPass.end();
         }
@@ -255,35 +247,9 @@ class Scene01 extends DogScene {
     }
 
     //------------------- main functions -------------------
-    createShapes() {
-        const shape = new DogShape();
-
-        let descriptor = {};
-        descriptor.delta = [100.0, 0.0, 100.0];
-        descriptor.numVertRows = 50;
-        descriptor.numVertCols = 50;
-        descriptor.position = [0.0, 0.0, 0.0];
-        descriptor.texScale = 1.0;
-        this.grid = shape.createGrid(descriptor);
-
-        descriptor.numVertCols = 25;
-        descriptor.numVertRows = 25;
-        this.floor = shape.createGrid(descriptor);
-
-        descriptor = {};
-        descriptor.width = 200.0;
-        descriptor.height = 200.0;
-        descriptor.depth = 200.0;
-        descriptor.boundingVolumeType = BoundingVolumeType.Box;
-        this.cube = shape.createCube(descriptor);
-        this.cube.getTransform().translateAbsolute(0.0, 100.0, 0.0);
-
-        descriptor = {};
-        descriptor.radio = 100.0;
-        descriptor.slices = 25;
-        descriptor.stacks = 25;
-        this.sphere = shape.createSphere(descriptor);
-        this.sphere.getTransform().translateAbsolute(300.0, 100.0, 0.0);
+    async createShapes() {
+        this.sponza = await webGPUengine.createMeshByObjFile("/resources/models/sponza/sponza.obj");
+        this.sponza.getTransform().translateAbsolute(0.0, 0.0, 0.0);
     }
 
     /**
@@ -443,7 +409,7 @@ class Scene01 extends DogScene {
 
         const idBindGroupBuffer = this.createBGBuffer(this.directionalLight, 0, this.directionalLightBindGroupLayout);
 
-        const material = new DogMaterial("m_yellow", true, false);
+        /*const material = new DogMaterial("m_yellow", true, false);
         material.setDiffuseColor([1.0, 1.0, 0.0, 1.0]);
         material.setAmbientColor([0.1, 0.1, 0.0, 1.0]);
         material.setSpecularColor([0.7, 0.7, 0.7, 1.0]);
@@ -461,7 +427,7 @@ class Scene01 extends DogScene {
         const defaultMaterial = webGPUengine.createDefaultMaterial("default-material", true, false);
         const idBindGroupDefMat = this.createBGMaterialTexSamp(defaultMaterial, dummyTexture, sampler);
 
-        this.floor.setMaterial(0, defaultMaterial.getId());
+        this.floor.setMaterial(0, defaultMaterial.getId());*/
     }
 
     /**
@@ -529,8 +495,8 @@ class Scene01 extends DogScene {
 
     async createDynamicLights() {
         this.kMaxNumLights = 1024;
-        const lightExtentMin = [-500, 0, -500];
-        const lightExtentMax = [500, 500, 500];
+        const lightExtentMin = [-1300, 0, -450];
+        const lightExtentMax = [1300, 1300, 450];
 
         // Lights data are uploaded in a storage buffer
         // which could be updated/culled/etc. with a compute shader
@@ -559,6 +525,8 @@ class Scene01 extends DogScene {
                 tmpVec4[i] = Math.random() * extent[i] + lightExtentMin[i];
             }
 
+            console.log("t = " + tmpVec4);
+
             tmpVec4[3] = 1;
             lightData.set(tmpVec4, offset);
 
@@ -568,7 +536,7 @@ class Scene01 extends DogScene {
             tmpVec4[2] = Math.random() * 2;
 
             // radius
-            tmpVec4[3] = 100.0;
+            tmpVec4[3] = 300.0;
             lightData.set(tmpVec4, offset + 4);
         }
 
